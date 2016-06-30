@@ -1,5 +1,5 @@
 # PhpClickHouseClient
-PHP Client for ClickHouse HTTP interface
+PHP Client for [ClickHouse](https://github.com/yandex/ClickHouse) HTTP interface
 
 # Use example
 ````php
