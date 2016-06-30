@@ -1,0 +1,20 @@
+{
+	"name": "SevaCode/PhpClickHouseClient",
+	"type": "library",
+	"description": "PHP Client for ClickHouse HTTP interface",
+	"keywords": ["clickhouse"],
+	"license": "MIT",
+	"authors": [
+		{
+			"name": "SevaCode"
+		}
+	],
+	"autoload": {
+		"psr-4": {
+			"SevaCode\\ClickHouseClient\\": "src/"
+		}
+	},
+	"require": {
+		"php": "~5.6"
+	}
+}
