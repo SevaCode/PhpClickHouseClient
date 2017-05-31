@@ -1,7 +1,11 @@
 # PhpClickHouseClient
 PHP Client for [ClickHouse](https://github.com/yandex/ClickHouse) HTTP interface
 
-# Use example
+# Use examples
+````php
+$data = (new HttpClient())->getData($query);
+````
+
 ````php
 $client = new HttpClient();
 

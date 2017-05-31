@@ -139,4 +139,15 @@ class HttpClient
 
 		return $result;
 	}
+
+	/**
+	 * @param string $query
+	 * @return array|null
+	 */
+	function getData($query)
+	{
+		$this->setFormat(Format::JSON);
+		$result = json_decode($this->query($query), true);
+		return $result['data'];
+	}
 }
