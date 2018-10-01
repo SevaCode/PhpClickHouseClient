@@ -143,6 +143,6 @@ class ChcClient
      */
     public function ping()
     {
-        return $this->runRequest($this->makeRequest(''))->getBody() === ('Ok.' . PHP_EOL);
+        return $this->getRaw('') === ('Ok.' . PHP_EOL);
     }
 }
