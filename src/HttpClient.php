@@ -165,6 +165,6 @@ class HttpClient
      */
     function ping()
     {
-        return 'Ok.' === $this->runRequest($this->makeRequest(''))->getBody();
+        return $this->runRequest($this->makeRequest(''))->getBody() === ('Ok.' . PHP_EOL);
     }
 }
