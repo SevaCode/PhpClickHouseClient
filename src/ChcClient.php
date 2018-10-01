@@ -6,6 +6,7 @@
 
 namespace SevaCode\ClickHouseClient;
 
+use SevaCode\ClickHouseClient\Responses\ChcResponse;
 
 class ChcClient
 {
@@ -102,12 +103,11 @@ class ChcClient
     /**
      * @param string $query
      * @param string $returnFormat
-     * @return string
+     * @return ChcResponse
      */
-    function execute($query, $returnFormat = '')
+    public function execute($query, $returnFormat = '')
     {
-        return $this->runRequest($this->makeRequest($query, $returnFormat))
-            ->getBody();
+        return $this->runRequest($this->makeRequest($query, $returnFormat));
     }
 
     /**
@@ -115,26 +115,25 @@ class ChcClient
      * @param string $returnFormat
      * @return string
      */
-    function getRaw($query, $returnFormat = '')
+    public function getRaw($query, $returnFormat = '')
     {
-        return $this->execute($query, $returnFormat);
+        return $this->execute($query, $returnFormat)->getBody();
     }
 
     /**
      * @param string $query
      * @return array
      */
-    function getJson($query)
+    public function getJson($query)
     {
-        return $this->runRequest($this->makeRequest($query, ChcFormat::JSON))
-            ->getResponse();
+        return $this->execute($query, ChcFormat::JSON)->getResponse();
     }
 
     /**
      * @param string $query
      * @return array|null
      */
-    function getJsonData($query)
+    public function getJsonData($query)
     {
         return $this->getJson($query)['data'];
     }
@@ -142,7 +141,7 @@ class ChcClient
     /**
      * @return true
      */
-    function ping()
+    public function ping()
     {
         return $this->runRequest($this->makeRequest(''))->getBody() === ('Ok.' . PHP_EOL);
     }
