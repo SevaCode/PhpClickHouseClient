@@ -10,12 +10,16 @@ $data = (new HttpClient())->getData($query);
 $client = new HttpClient();
 
 try {
-	$client->setMode(Mode::READONLY);
-	$client->setFormat(Format::JSONEachRow);
-	$result = $client->query($query);
+    if ($client->ping()) {
+        $client->readOnly(true);
+        $client->setFormat(Format::JSONEachRow);
+        $result = $client->query($query);
+    } else {
+        throw new Exception('ClickHouse is down.');
+    }
 }
 catch (ChcException $e) {
-	$error = $e->getMessage();
+    $error = $e->getMessage();
 }
 $latency = $client->getLastQueryLatency();
 ````
@@ -23,12 +27,12 @@ $latency = $client->getLastQueryLatency();
 # Install through [Composer](https://getcomposer.org/)
 ````json
 "require": {
-	"SevaCode/PhpClickHouseClient": "^1.0-dev"
+    "SevaCode/PhpClickHouseClient": "^1.0-dev"
 },
 "repositories": [
-	{
-		"type": "vcs",
-		"url": "https://github.com/SevaCode/PhpClickHouseClient.git"
-	}
+    {
+        "type": "vcs",
+        "url": "https://github.com/SevaCode/PhpClickHouseClient.git"
+    }
 ]
 ````

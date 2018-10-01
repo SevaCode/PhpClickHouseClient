@@ -6,7 +6,9 @@
 
 namespace SevaCode\ClickHouseClient;
 
-
+/**
+ * @deprecated 
+ */
 class Mode
 {
     const READONLY = 'readonly';

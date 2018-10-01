@@ -16,9 +16,12 @@ class HttpClient
         //'max_rows_to_group_by' => 2000000,
     ];
 
+    protected $isReadOnly = true;
+
     /**
      * readonly or write
      * @var string
+     * @deprecated use $this->readOnly
      */
     protected $mode = Mode::READONLY;
 
@@ -35,8 +38,24 @@ class HttpClient
     protected $last_query_latency;
 
     /**
+     * @param boolean|null $isReadOnly
+     * @return bool
+     */
+    public function readOnly($isReadOnly = null)
+    {
+        $old = $this->isReadOnly;
+
+        if (!is_null($isReadOnly)) {
+            $this->isReadOnly = (boolean)$isReadOnly;
+        }
+
+        return $old;
+    }
+
+    /**
      * readonly or write
      * @return string
+     * @deprecated use $this->readOnly()
      */
     public function getMode()
     {
@@ -46,10 +65,12 @@ class HttpClient
     /**
      * readonly or write
      * @param string $mode
+     * @deprecated use $this->readOnly(true|false)
      */
     public function setMode($mode)
     {
         $this->mode = $mode;
+        $this->readOnly(Mode::isReadOnly($mode));
     }
 
     /**
@@ -102,6 +123,9 @@ class HttpClient
 
     public function query($query)
     {
+        if ($this->isReadOnly && $this->format) {
+            $query .= PHP_EOL . 'FORMAT ' . $this->format;
+        }
         return $this->runRequest($this->makeRequest($query, $this->format))
             ->getBody();
     }
@@ -117,7 +141,7 @@ class HttpClient
     private function runRequest(ChcRequest $request)
     {
         $transport = (new ChcHttpTransport($this->url))
-            ->setReadOnly(Mode::isReadOnly($this->mode));
+            ->setReadOnly($this->isReadOnly);
 
         try {
             return $transport->run($request);
