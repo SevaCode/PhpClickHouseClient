@@ -6,7 +6,7 @@
 
 namespace SevaCode\ClickHouseClient\Responses;
 
-use SevaCode\ClickHouseClient\Format;
+use SevaCode\ClickHouseClient\ChcFormat;
 
 class ChcResponseFactory
 {
@@ -31,7 +31,7 @@ class ChcResponseFactory
     public function make($body = '')
     {
         switch ($this->format) {
-            case Format::JSON:
+            case ChcFormat::JSON:
                 return new ChcJsonResponse($body);
 
             default:

@@ -6,14 +6,14 @@
 
 namespace SevaCode\ClickHouseClient\Responses;
 
-use SevaCode\ClickHouseClient\Format;
+use SevaCode\ClickHouseClient\ChcFormat;
 
 class ChcJsonResponse extends ChcResponse
 {
     public function __construct($body)
     {
         parent::__construct($body);
-        $this->format = Format::JSON;
+        $this->format = ChcFormat::JSON;
     }
 
     public function getResponse()

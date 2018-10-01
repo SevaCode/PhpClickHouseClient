@@ -39,6 +39,9 @@ class ChcResponse
         $this->body = $body;
     }
 
+    /**
+     * @return mixed
+     */
     public function getResponse()
     {
         return $this->getBody();

@@ -3,17 +3,16 @@ PHP Client for [ClickHouse](https://github.com/yandex/ClickHouse) HTTP interface
 
 # Use examples
 ````php
-$data = (new HttpClient())->getData($query);
+$data = (new ChcClient())->getJsonData($query);
 ````
 
 ````php
-$client = new HttpClient();
+$client = new ChcClient();
 
 try {
     if ($client->ping()) {
         $client->readOnly(true);
-        $client->setFormat(Format::JSONEachRow);
-        $result = $client->query($query);
+        $result = $client->getRaw($query, ChcFormat::JSONEachRow);
     } else {
         throw new Exception('ClickHouse is down.');
     }

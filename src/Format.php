@@ -6,12 +6,9 @@
 
 namespace SevaCode\ClickHouseClient;
 
-
-class Format
+/**
+ * @deprecated use ChcFormat
+ */
+class Format extends ChcFormat
 {
-    const TabSeparated = 'TabSeparated';
-    const TabSeparatedWithNames = 'TabSeparatedWithNames';
-    const JSON = 'JSON';
-    const JSONEachRow = 'JSONEachRow';
-    const Pretty = 'Pretty';
 }
