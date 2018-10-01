@@ -102,12 +102,22 @@ class ChcClient
     /**
      * @param string $query
      * @param string $returnFormat
-     * @return array
+     * @return string
      */
-    function getRaw($query, $returnFormat = '')
+    function execute($query, $returnFormat = '')
     {
         return $this->runRequest($this->makeRequest($query, $returnFormat))
             ->getBody();
+    }
+
+    /**
+     * @param string $query
+     * @param string $returnFormat
+     * @return string
+     */
+    function getRaw($query, $returnFormat = '')
+    {
+        return $this->execute($query, $returnFormat);
     }
 
     /**
