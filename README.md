@@ -14,7 +14,7 @@ try {
 	$client->setFormat(Format::JSONEachRow);
 	$result = $client->query($query);
 }
-catch (ClickHouseException $e) {
+catch (ChcException $e) {
 	$error = $e->getMessage();
 }
 $latency = $client->getLastQueryLatency();

@@ -9,145 +9,138 @@ namespace SevaCode\ClickHouseClient;
 
 class HttpClient
 {
-	protected $url = 'http://localhost:8123/';
-	protected $settings = [
-		//'database' => 'default',
-		//'max_memory_usage' => 100000000,
-		//'max_rows_to_group_by' => 2000000,
-	];
+    protected $url = 'http://localhost:8123/';
+    protected $settings = [
+        //'database' => 'default',
+        //'max_memory_usage' => 100000000,
+        //'max_rows_to_group_by' => 2000000,
+    ];
 
-	/**
-	 * readonly or write
-	 * @var string
-	 */
-	protected $mode = Mode::READONLY;
+    /**
+     * readonly or write
+     * @var string
+     */
+    protected $mode = Mode::READONLY;
 
-	/**
-	 * @see Format
-	 * @var string
-	 */
-	protected $format = '';
+    /**
+     * @see Format
+     * @var string
+     */
+    protected $format = '';
 
-	/**
-	 * seconds
-	 * @var float
-	 */
-	protected $last_query_latency;
+    /**
+     * seconds
+     * @var float
+     */
+    protected $last_query_latency;
 
-	/**
-	 * readonly or write
-	 * @return string
-	 */
-	public function getMode()
-	{
-		return $this->mode;
-	}
+    /**
+     * readonly or write
+     * @return string
+     */
+    public function getMode()
+    {
+        return $this->mode;
+    }
 
-	/**
-	 * readonly or write
-	 * @param string $mode
-	 */
-	public function setMode($mode)
-	{
-		$this->mode = $mode;
-	}
+    /**
+     * readonly or write
+     * @param string $mode
+     */
+    public function setMode($mode)
+    {
+        $this->mode = $mode;
+    }
 
-	/**
-	 * @see Format
-	 * @return string
-	 */
-	public function getFormat()
-	{
-		return $this->format;
-	}
+    /**
+     * @see Format
+     * @return string
+     */
+    public function getFormat()
+    {
+        return $this->format;
+    }
 
-	/**
-	 * @see Format
-	 * @param string $format
-	 */
-	public function setFormat($format)
-	{
-		$this->format = $format;
-	}
+    /**
+     * @see Format
+     * @param string $format
+     */
+    public function setFormat($format)
+    {
+        $this->format = $format;
+    }
 
-	public function setDatabase($database)
-	{
-		$this->settings['database'] = $database;
-	}
+    public function setDatabase($database)
+    {
+        $this->settings['database'] = $database;
+    }
 
-	/**
-	 * @return string
-	 */
-	public function getUrl()
-	{
-		return $this->url;
-	}
+    /**
+     * @return string
+     */
+    public function getUrl()
+    {
+        return $this->url;
+    }
 
-	/**
-	 * @param string $url
-	 */
-	public function setUrl($url)
-	{
-		$this->url = $url;
-	}
+    /**
+     * @param string $url
+     */
+    public function setUrl($url)
+    {
+        $this->url = $url;
+    }
 
-	/**
-	 * seconds
-	 * @return float
-	 */
-	public function getLastQueryLatency()
-	{
-		return $this->last_query_latency;
-	}
+    /**
+     * seconds
+     * @return float
+     */
+    public function getLastQueryLatency()
+    {
+        return $this->last_query_latency;
+    }
 
-	public function query($query)
-	{
-		$httpQueryValues = $this->settings;
+    public function query($query)
+    {
+        return $this->runRequest($this->makeRequest($query, $this->format))
+            ->getBody();
+    }
 
-		$streamOpts = array(
-			'http'=>array(
-				'method' => 'GET',
-				'ignore_errors' => true,
-			),
-		);
+    private function makeRequest($query, $format = '')
+    {
+        return (new ChcRequest)
+            ->setSettings($this->settings)
+            ->setQuery($query)
+            ->setReturnFormat($format);
+    }
 
-		if ($query) {
-			if (Mode::isReadOnly($this->mode)) {
-				if ($this->format) {
-					$query .= PHP_EOL . 'FORMAT ' . $this->format;
-				}
-				$httpQueryValues['query'] = $query;
-			}
-			else {
-				$streamOpts['http']['method'] = 'POST';
-				$streamOpts['http']['header'] = "Content-type: application/x-www-form-urlencoded";
-				$streamOpts['http']['content'] = $query;
-			}
-		}
+    private function runRequest(ChcRequest $request)
+    {
+        $transport = (new ChcHttpTransport($this->url))
+            ->setReadOnly(Mode::isReadOnly($this->mode));
 
-		$context = stream_context_create($streamOpts);
-		$url = $this->url . '?' . http_build_query($httpQueryValues);
+        try {
+            return $transport->run($request);
+        } finally {
+            $this->last_query_latency = $transport->getLastQueryLatency();
+        }
+    }
 
-		// Выполняем запрос к ClickHouse
-		$timeStart = microtime(true);
-		$result = file_get_contents($url, false, $context);
-		$this->last_query_latency = microtime(true) - $timeStart;
+    /**
+     * @param string $query
+     * @return array|null
+     */
+    function getData($query)
+    {
+        return $this->runRequest($this->makeRequest($query, Format::JSON))
+            ->getResponse()['data'];
+    }
 
-		if (!preg_match('~^HTTP/\d\.\d 200 ~i', $http_response_header[0])) {
-			throw new ClickHouseException($result, 500);
-		}
-
-		return $result;
-	}
-
-	/**
-	 * @param string $query
-	 * @return array|null
-	 */
-	function getData($query)
-	{
-		$this->setFormat(Format::JSON);
-		$result = json_decode($this->query($query), true);
-		return $result['data'];
-	}
+    /**
+     * @return true
+     */
+    function ping()
+    {
+        return 'Ok.' === $this->runRequest($this->makeRequest(''))->getBody();
+    }
 }

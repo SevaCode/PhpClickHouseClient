@@ -9,15 +9,15 @@ namespace SevaCode\ClickHouseClient;
 
 class Mode
 {
-	const READONLY = 'readonly';
-	const WRITE = 'write';
+    const READONLY = 'readonly';
+    const WRITE = 'write';
 
-	/**
-	 * @param string $mode
-	 * @return bool
-	 */
-	public static function isReadOnly($mode)
-	{
-		return self::READONLY === $mode;
-	}
+    /**
+     * @param string $mode
+     * @return bool
+     */
+    public static function isReadOnly($mode)
+    {
+        return self::READONLY === $mode;
+    }
 }

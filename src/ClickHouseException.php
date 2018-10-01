@@ -6,7 +6,7 @@
 
 namespace SevaCode\ClickHouseClient;
 
-
-use Exception;
-
-class ClickHouseException extends \Exception {}
+/**
+ * @deprecated use ChcException
+ */
+class ClickHouseException extends ChcException {};

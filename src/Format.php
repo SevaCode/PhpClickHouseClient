@@ -9,9 +9,9 @@ namespace SevaCode\ClickHouseClient;
 
 class Format
 {
-	const TabSeparated = 'TabSeparated';
-	const TabSeparatedWithNames = 'TabSeparatedWithNames';
-	const JSON = 'JSON';
-	const JSONEachRow = 'JSONEachRow';
-	const Pretty = 'Pretty';
+    const TabSeparated = 'TabSeparated';
+    const TabSeparatedWithNames = 'TabSeparatedWithNames';
+    const JSON = 'JSON';
+    const JSONEachRow = 'JSONEachRow';
+    const Pretty = 'Pretty';
 }
