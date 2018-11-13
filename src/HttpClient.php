@@ -76,7 +76,7 @@ class HttpClient extends ChcClient
         if ($this->isReadOnly) {
             return $this->getRaw($query, $this->format);
         } else {
-            return $this->execute($query, $this->format);
+            return $this->execute($query, $this->format)->getBody();
         }
     }
 
