@@ -73,10 +73,11 @@ class HttpClient extends ChcClient
 
     public function query($query)
     {
-        if ($this->isReadOnly && $this->format) {
-            $query .= PHP_EOL . 'FORMAT ' . $this->format;
+        if ($this->isReadOnly) {
+            return $this->getRaw($query, $this->format);
+        } else {
+            return $this->execute($query, $this->format);
         }
-        return $this->getRaw($query, $this->format);
     }
 
     /**

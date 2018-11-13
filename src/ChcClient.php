@@ -117,7 +117,7 @@ class ChcClient
      */
     public function getRaw($query, $returnFormat = '')
     {
-        return $this->execute($query, $returnFormat)->getBody();
+        return $this->select($query, $returnFormat)->getBody();
     }
 
     /**
@@ -126,7 +126,7 @@ class ChcClient
      */
     public function getJson($query)
     {
-        return $this->execute($query, ChcFormat::JSON)->getResponse();
+        return $this->select($query, ChcFormat::JSON)->getResponse();
     }
 
     /**
@@ -144,5 +144,20 @@ class ChcClient
     public function ping()
     {
         return $this->getRaw('') === ('Ok.' . PHP_EOL);
+    }
+
+    /**
+     * @param string $query
+     * @param string $format
+     * @return ChcResponse
+     */
+    private function select($query, $format)
+    {
+        return $this->execute($query . $this->getQueryFormatPostfix($format), $format);
+    }
+
+    private function getQueryFormatPostfix($format)
+    {
+        return $format ? PHP_EOL . 'FORMAT ' . $format : '';
     }
 }
