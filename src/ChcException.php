@@ -6,4 +6,28 @@
 
 namespace SevaCode\ClickHouseClient;
 
-class ChcException extends \Exception {}
+use Exception;
+
+class ChcException extends \Exception
+{
+    /**
+     * @var string
+     */
+    private $query;
+
+    /**
+     * @return string
+     */
+    public function getQuery()
+    {
+        return $this->query;
+    }
+
+    /**
+     * @param string $query
+     */
+    public function setQuery($query)
+    {
+        $this->query = $query;
+    }
+}

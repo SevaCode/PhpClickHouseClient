@@ -61,7 +61,9 @@ class ChcHttpTransport
         }
 
         if (!preg_match('~^HTTP/\d\.\d 200 ~i', $http_response_header[0])) {
-            throw new ClickHouseException($body, 500);
+            $e = new ClickHouseException($body, 500);
+            $e->setQuery($query);
+            throw $e;
         }
 
         return (new ChcResponseFactory($request->getReturnFormat()))
