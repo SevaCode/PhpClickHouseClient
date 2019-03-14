@@ -26,12 +26,6 @@ $latency = $client->getLastQueryLatency();
 # Install through [Composer](https://getcomposer.org/)
 ````json
 "require": {
-    "SevaCode/PhpClickHouseClient": "^1.2.0-dev"
-},
-"repositories": [
-    {
-        "type": "vcs",
-        "url": "https://github.com/SevaCode/PhpClickHouseClient.git"
-    }
-]
+    "seva-code/php-click-house-client": "^1.2.0"
+}
 ````
