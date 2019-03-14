@@ -1,5 +1,5 @@
 {
-	"name": "SevaCode/PhpClickHouseClient",
+	"name": "seva-code/php-click-house-client",
 	"type": "library",
 	"description": "PHP Client for ClickHouse HTTP interface",
 	"keywords": ["clickhouse"],
@@ -19,7 +19,7 @@
 	},
 	"extra": {
 		"branch-alias": {
-			"dev-master": "1.1.x-dev"
+			"dev-master": "1.2.x-dev"
 		}
 	}
 }
