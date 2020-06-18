@@ -26,6 +26,6 @@ $latency = $client->getLastQueryLatency();
 # Install through [Composer](https://getcomposer.org/)
 ````json
 "require": {
-    "seva-code/php-click-house-client": "^1.2.0"
+    "seva-code/php-click-house-client": "^1.2.0-dev"
 }
 ````

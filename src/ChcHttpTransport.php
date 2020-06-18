@@ -60,8 +60,17 @@ class ChcHttpTransport
             $this->last_query_latency = microtime(true) - $timeStart;
         }
 
-        if (!preg_match('~^HTTP/\d\.\d 200 ~i', $http_response_header[0])) {
-            $e = new ClickHouseException($body, 500);
+        $httpStatusLine = $http_response_header[0];
+
+        preg_match('{HTTP\/\S*\s(\d{3})}', $httpStatusLine, $match);
+
+        $httpStatus = $match[1];
+
+        if (200 != $httpStatus) {
+            if (empty($body)) {
+                $body = 'Unexpected response status: ' . $httpStatusLine;
+            }
+            $e = new ChcException($body, $httpStatus);
             $e->setQuery($query);
             throw $e;
         }
