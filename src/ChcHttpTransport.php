@@ -24,7 +24,7 @@ class ChcHttpTransport
      * ChcHttpTransport constructor.
      * @param string $url
      */
-    public function __construct($url)
+    public function __construct(string $url)
     {
         $this->url = $url;
     }
@@ -40,13 +40,30 @@ class ChcHttpTransport
             ),
         );
 
+        $httpHeader = [];
+
+        // Authentication using the "X-ClickHouse-User" and "X-ClickHouse-Key" headers.
+        // https://clickhouse.com/docs/en/interfaces/http/
+        if (!empty($httpQueryValues['user'])) {
+            $httpHeader[] = 'X-ClickHouse-User: ' . $httpQueryValues['user'];
+            unset($httpQueryValues['user']);
+        }
+        if (!empty($httpQueryValues['password'])) {
+            $httpHeader[] = 'X-ClickHouse-Key: ' . $httpQueryValues['password'];
+            unset($httpQueryValues['password']);
+        }
+
         if ($query = $request->getQuery()) {
             if ('POST' === $this->method) {
-                $streamOpts['http']['header'] = "Content-type: application/x-www-form-urlencoded";
+                $httpHeader[] = "Content-type: application/x-www-form-urlencoded";
                 $streamOpts['http']['content'] = $query;
             } else {
                 $httpQueryValues['query'] = $query;
             }
+        }
+
+        if (!empty($httpHeader)) {
+            $streamOpts['http']['header'] = $httpHeader;
         }
 
         $context = stream_context_create($streamOpts);
@@ -79,20 +96,13 @@ class ChcHttpTransport
             ->make($body);
     }
 
-    /**
-     * @param boolean $mode
-     * @return $this
-     */
-    public function setReadOnly($mode)
+    public function setReadOnly(bool $mode): ChcHttpTransport
     {
         $this->method = $mode ? 'GET' : 'POST';
         return $this;
     }
 
-    /**
-     * @return float
-     */
-    public function getLastQueryLatency()
+    public function getLastQueryLatency(): float
     {
         return $this->last_query_latency;
     }
