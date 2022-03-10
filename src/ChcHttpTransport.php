@@ -44,12 +44,16 @@ class ChcHttpTransport
 
         // Authentication using the "X-ClickHouse-User" and "X-ClickHouse-Key" headers.
         // https://clickhouse.com/docs/en/interfaces/http/
-        if (!empty($httpQueryValues['user'])) {
-            $httpHeader[] = 'X-ClickHouse-User: ' . $httpQueryValues['user'];
+        if (isset($httpQueryValues['user'])) {
+            if (!empty($httpQueryValues['user'])) {
+                $httpHeader[] = 'X-ClickHouse-User: ' . $httpQueryValues['user'];
+            }
             unset($httpQueryValues['user']);
         }
-        if (!empty($httpQueryValues['password'])) {
-            $httpHeader[] = 'X-ClickHouse-Key: ' . $httpQueryValues['password'];
+        if (isset($httpQueryValues['password'])) {
+            if (!empty($httpQueryValues['password'])) {
+                $httpHeader[] = 'X-ClickHouse-Key: ' . $httpQueryValues['password'];
+            }
             unset($httpQueryValues['password']);
         }
 
@@ -64,6 +68,16 @@ class ChcHttpTransport
 
         if (!empty($httpHeader)) {
             $streamOpts['http']['header'] = $httpHeader;
+        }
+
+        if (isset($httpQueryValues['ssl_cafile'])) {
+            if (!empty($httpQueryValues['ssl_cafile'])) {
+                $streamOpts['ssl'] = [
+                    'cafile' => $httpQueryValues['ssl_cafile'],
+                    'verify_peer' => true,
+                ];
+            }
+            unset($httpQueryValues['ssl_cafile']);
         }
 
         $context = stream_context_create($streamOpts);
