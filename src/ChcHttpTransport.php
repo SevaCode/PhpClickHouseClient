@@ -33,9 +33,14 @@ class ChcHttpTransport
     {
         $httpQueryValues = $request->getSettings();
 
+        $query = $request->getQuery();
+
+        // пустой запрос (ping) всегда отпрвляем GET'ом
+        $httpMethod = empty($query) ? 'GET' : $this->method;
+
         $streamOpts = array(
             'http'=>array(
-                'method' => $this->method,
+                'method' => $httpMethod,
                 'ignore_errors' => true,
             ),
         );
@@ -57,8 +62,8 @@ class ChcHttpTransport
             unset($httpQueryValues['password']);
         }
 
-        if ($query = $request->getQuery()) {
-            if ('POST' === $this->method) {
+        if (!empty($query)) {
+            if ('POST' === $httpMethod) {
                 $httpHeader[] = "Content-type: application/x-www-form-urlencoded";
                 $streamOpts['http']['content'] = $query;
             } else {
@@ -110,9 +115,9 @@ class ChcHttpTransport
             ->make($body);
     }
 
-    public function setReadOnly(bool $mode): ChcHttpTransport
+    public function setReadOnly(bool $isReadOnly): ChcHttpTransport
     {
-        $this->method = $mode ? 'GET' : 'POST';
+        $this->method = $isReadOnly ? 'GET' : 'POST';
         return $this;
     }
 
