@@ -26,7 +26,7 @@ class ChcHttpTransport
      */
     public function __construct(string $url)
     {
-        $this->url = $url;
+        $this->url = rtrim($url, '/');
     }
 
     public function run(ChcRequest $request)
@@ -62,7 +62,10 @@ class ChcHttpTransport
             unset($httpQueryValues['password']);
         }
 
-        if (!empty($query)) {
+        if (empty($query)) {
+            $httpPath = 'ping';
+        } else {
+            $httpPath = '';
             if ('POST' === $httpMethod) {
                 $httpHeader[] = "Content-type: application/x-www-form-urlencoded";
                 $streamOpts['http']['content'] = $query;
@@ -86,7 +89,7 @@ class ChcHttpTransport
         }
 
         $context = stream_context_create($streamOpts);
-        $url = $this->url . '?' . http_build_query($httpQueryValues);
+        $url = $this->url . '/' . $httpPath . '?' . http_build_query($httpQueryValues);
 
         // Выполняем запрос к ClickHouse
         $timeStart = microtime(true);
