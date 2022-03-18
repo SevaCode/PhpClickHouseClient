@@ -62,8 +62,19 @@ class ChcHttpTransport
             unset($httpQueryValues['password']);
         }
 
+        if (isset($httpQueryValues['ssl_cafile'])) {
+            if (!empty($httpQueryValues['ssl_cafile'])) {
+                $streamOpts['ssl'] = [
+                    'cafile' => $httpQueryValues['ssl_cafile'],
+                    'verify_peer' => true,
+                ];
+            }
+            unset($httpQueryValues['ssl_cafile']);
+        }
+
         if (empty($query)) {
             $httpPath = 'ping';
+            $httpQueryValues = [];
         } else {
             $httpPath = '';
             if ('POST' === $httpMethod) {
@@ -76,16 +87,6 @@ class ChcHttpTransport
 
         if (!empty($httpHeader)) {
             $streamOpts['http']['header'] = $httpHeader;
-        }
-
-        if (isset($httpQueryValues['ssl_cafile'])) {
-            if (!empty($httpQueryValues['ssl_cafile'])) {
-                $streamOpts['ssl'] = [
-                    'cafile' => $httpQueryValues['ssl_cafile'],
-                    'verify_peer' => true,
-                ];
-            }
-            unset($httpQueryValues['ssl_cafile']);
         }
 
         $context = stream_context_create($streamOpts);
