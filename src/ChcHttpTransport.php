@@ -90,7 +90,7 @@ class ChcHttpTransport
         }
 
         $context = stream_context_create($streamOpts);
-        $url = $this->url . '/' . $httpPath . '?' . http_build_query($httpQueryValues);
+        $url = $this->url . '/' . $httpPath . (empty($httpQueryValues) ? '' : ('?' . http_build_query($httpQueryValues)));
 
         // Выполняем запрос к ClickHouse
         $timeStart = microtime(true);
