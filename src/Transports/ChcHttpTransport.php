@@ -4,8 +4,10 @@
  * CreatedAt: 01.10.2018
  */
 
-namespace SevaCode\ClickHouseClient;
+namespace SevaCode\ClickHouseClient\Transports;
 
+use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\ChcRequest;
 use SevaCode\ClickHouseClient\Responses\ChcResponseFactory;
 
 class ChcHttpTransport
