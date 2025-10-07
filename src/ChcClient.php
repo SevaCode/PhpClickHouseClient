@@ -6,6 +6,7 @@
 
 namespace SevaCode\ClickHouseClient;
 
+use Psr\Log\LoggerInterface;
 use SevaCode\ClickHouseClient\Responses\ChcResponse;
 use SevaCode\ClickHouseClient\Transports\ChcHttpTransport;
 use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;
@@ -29,6 +30,8 @@ class ChcClient
      * @var float
      */
     protected $last_query_latency;
+
+    private ?LoggerInterface $sqlLogger = null;
 
     /**
      * @param boolean|null $isReadOnly
@@ -82,6 +85,8 @@ class ChcClient
      */
     protected function makeRequest($query, $format = '')
     {
+        $this->logSql((string)$query);
+
         return (new ChcRequest)
             ->setSettings($this->settings)
             ->setQuery($query)
@@ -255,5 +260,19 @@ class ChcClient
 //        }
 //
 //        return $result;
+    }
+
+    public function setSqlLogger(?LoggerInterface $sqlLogger): void
+    {
+        $this->sqlLogger = $sqlLogger;
+    }
+
+    private function logSql(string $query): void
+    {
+        if (is_null($this->sqlLogger)) {
+            return;
+        }
+
+        $this->sqlLogger->info($query);
     }
 }
