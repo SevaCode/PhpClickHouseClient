@@ -186,35 +186,45 @@ class ChcClient
         $transport = (new ChcSymfonyCurlTransport($client))
             ->setReadOnly($this->isReadOnly);
 
-        try {
-
-            $responses = array_map(
-                fn(string $query) => $transport->request(
-                    $this->makeRequest($query . $formatPostfix, ChcFormat::JSON)
-                ), $queries
-            );
-
-            return array_map(
-                function (ExtendedSymfonyHttpResponse $response) use ($transport, $callback) {
-                    $jsonResponse = $transport->response($response)->getResponse();
-                    return $callback(
-                        $jsonResponse['data'],
-                        $jsonResponse['meta'],
-                        $jsonResponse['rows'],
-                        $jsonResponse['rows_before_limit_at_least'] ?? null,
-                        $jsonResponse['statistics'] ?? null,
-                        $jsonResponse['totals'] ?? null,
-                        $jsonResponse['extremes'] ?? null,
-                        $response->getInfo('start_time'),
+        $responses = array_map(
+            function (string $query) use ($transport, $formatPostfix) {
+                $request = $this->makeRequest($query . $formatPostfix, ChcFormat::JSON);
+                try {
+                    return $transport->request($request);
+                } catch (TransportExceptionInterface $e) {
+                    throw ChcException::create(
+                        message: $e->getMessage(),
+                        previous: $e,
+                        query: $request->getQuery(),
                     );
-                }, $responses
-            );
+                }
+            }, $queries
+        );
 
-        } catch (TransportExceptionInterface $e) {
-            $e = new ChcException($symfonyResponse->getContent(), $symfonyResponse->getStatusCode(), $e);
-            $e->setQuery($symfonyResponse->getQuery());
-            throw $e;
-        }
+        return array_map(
+            function (ExtendedSymfonyHttpResponse $response) use ($transport, $callback) {
+                try {
+                    $jsonResponse = $transport->response($response)->getResponse();
+                } catch (TransportExceptionInterface $e) {
+                    throw ChcException::create(
+                        message: $e->getMessage(),
+                        code: (int)$response->getInfo('http_code'),
+                        previous: $e,
+                        query: $response->getQuery(),
+                    );
+                }
+                return $callback(
+                    $jsonResponse['data'],
+                    $jsonResponse['meta'],
+                    $jsonResponse['rows'],
+                    $jsonResponse['rows_before_limit_at_least'] ?? null,
+                    $jsonResponse['statistics'] ?? null,
+                    $jsonResponse['totals'] ?? null,
+                    $jsonResponse['extremes'] ?? null,
+                    $response->getInfo('start_time'),
+                );
+            }, $responses
+        );
 
 //        /**
 //         * @var ExtendedSymfonyHttpResponse $symfonyResponse

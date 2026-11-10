@@ -65,11 +65,11 @@ class ChcSymfonyCurlTransport
             $url = '/ping';
         } else {
             $url = '';
+            $streamOpts['query'] = $httpQueryValues;
             if ('POST' === $httpMethod) {
                 $httpHeader['Content-type'] = 'application/x-www-form-urlencoded';
                 $streamOpts['body'] = $query;
             } else {
-                $streamOpts['query'] = $httpQueryValues;
                 $streamOpts['query']['query'] = $query;
             }
         }
@@ -79,7 +79,7 @@ class ChcSymfonyCurlTransport
         }
 
         return new ExtendedSymfonyHttpResponse(
-            decoratedResponse: $this->client->request($this->method, $url, $streamOpts),
+            decoratedResponse: $this->client->request($httpMethod, $url, $streamOpts),
             request: $request,
             query: $query,
         );
@@ -88,7 +88,7 @@ class ChcSymfonyCurlTransport
     public function response(ExtendedSymfonyHttpResponse $response): ChcResponse
     {
         // Выполняем запрос к ClickHouse
-        $body = $response->getContent();
+        $body = $response->getContent(false);
 
         $httpStatus = $response->getStatusCode();
 
@@ -96,13 +96,15 @@ class ChcSymfonyCurlTransport
             if (empty($body)) {
                 $body = 'Unexpected response status: ' . $httpStatus;
             }
-            $e = new ChcException($body, $httpStatus);
-            $e->setQuery($response->getQuery());
-            throw $e;
+            throw ChcException::create(
+                message: $body,
+                code: $httpStatus,
+                query: $response->getQuery(),
+            );
         }
 
         return (new ChcResponseFactory($response->getRequest()->getReturnFormat()))
-            ->make($body);
+            ->make($body, $httpStatus, $response->getQuery());
     }
 
     public function setReadOnly(bool $isReadOnly): static

@@ -29,3 +29,19 @@ $latency = $client->getLastQueryLatency();
     "seva-code/php-click-house-client": "^1.2.0-dev"
 }
 ````
+
+# Tests
+
+Run the regression tests from the repository root after installing dependencies:
+
+````bash
+composer install
+php tests/run.php
+````
+
+The tests use mocks and do not require a running ClickHouse server or PHPUnit.
+Run the script as a standalone PHP process because it replaces the HTTP client with a test double.
+
+A test deliberately triggers a stream failure to verify that its details are preserved
+in the exception. A `file_get_contents()` warning is expected in the output.
+A successful run ends with `0 failed` and exits with code `0`.

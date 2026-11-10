@@ -28,11 +28,11 @@ class ChcResponseFactory
      * @param string $body
      * @return ChcResponse
      */
-    public function make($body = '')
+    public function make($body = '', int $httpStatus = 0, ?string $query = null)
     {
         switch ($this->format) {
             case ChcFormat::JSON:
-                return new ChcJsonResponse($body);
+                return new ChcJsonResponse($body, $httpStatus, $query);
 
             default:
                 return new ChcResponse($body);

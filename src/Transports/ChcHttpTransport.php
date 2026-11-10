@@ -97,28 +97,43 @@ class ChcHttpTransport
         // Выполняем запрос к ClickHouse
         $timeStart = microtime(true);
         try {
+            error_clear_last();
             $body = file_get_contents($url, false, $context);
         } finally {
             $this->last_query_latency = microtime(true) - $timeStart;
         }
 
-        $httpStatusLine = $http_response_header[0];
+        if (false === $body || empty($http_response_header)) {
+            throw ChcException::create(
+                message: error_get_last()['message'] ?? 'Request failed',
+                query: $query,
+            );
+        }
 
-        preg_match('{HTTP\/\S*\s(\d{3})}', $httpStatusLine, $match);
+        $httpStatusLine = $http_response_header[0] ?? '';
 
-        $httpStatus = $match[1];
+        if (1 !== preg_match('{HTTP\/\S*\s(\d{3})}', $httpStatusLine, $match)) {
+            throw ChcException::create(
+                message: 'Unexpected response status: ' . $httpStatusLine,
+                query: $query,
+            );
+        }
+
+        $httpStatus = (int)$match[1];
 
         if (200 != $httpStatus) {
             if (empty($body)) {
                 $body = 'Unexpected response status: ' . $httpStatusLine;
             }
-            $e = new ChcException($body, $httpStatus);
-            $e->setQuery($query);
-            throw $e;
+            throw ChcException::create(
+                message: $body,
+                code: $httpStatus,
+                query: $query,
+            );
         }
 
         return (new ChcResponseFactory($request->getReturnFormat()))
-            ->make($body);
+            ->make($body, $httpStatus, $query);
     }
 
     public function setReadOnly(bool $isReadOnly): ChcHttpTransport
