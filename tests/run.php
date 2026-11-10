@@ -3,9 +3,9 @@
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcFormat;
-use SevaCode\ClickHouseClient\ChcMemoryLimitExceededException;
 use SevaCode\ClickHouseClient\ChcRequest;
-use SevaCode\ClickHouseClient\ChcTimeoutExceededException;
+use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
+use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use SevaCode\ClickHouseClient\Responses\ChcResponse;
 use SevaCode\ClickHouseClient\Transports\ChcHttpTransport;
 use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;

@@ -6,6 +6,8 @@
 
 namespace SevaCode\ClickHouseClient;
 
+use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
+use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 
 class ChcException extends \Exception
