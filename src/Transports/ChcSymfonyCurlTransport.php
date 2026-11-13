@@ -18,6 +18,9 @@ class ChcSymfonyCurlTransport
 {
     private string $method = 'GET';
     private HttpClientInterface $client;
+    private bool $readOnly = true;
+    private bool $readOnlyOverPost = false;
+    private ?float $timeout = null;
 
     public function __construct(HttpClientInterface $client)
     {
@@ -33,7 +36,18 @@ class ChcSymfonyCurlTransport
         // пустой запрос (ping) всегда отпрвляем GET'ом
         $httpMethod = empty($query) ? 'GET' : $this->method;
 
+        // Opt-in: read-only запрос POST'ом с readonly=2 — то же, что сервер выставляет для GET
+        if (!empty($query) && $this->readOnly && $this->readOnlyOverPost) {
+            $httpMethod = 'POST';
+            if (!isset($httpQueryValues['readonly'])) {
+                $httpQueryValues['readonly'] = 2;
+            }
+        }
+
         $streamOpts = [];
+        if (null !== $this->timeout) {
+            $streamOpts['timeout'] = $this->timeout;
+        }
 
         $httpHeader = [];
 
@@ -106,7 +120,23 @@ class ChcSymfonyCurlTransport
 
     public function setReadOnly(bool $isReadOnly): static
     {
+        $this->readOnly = $isReadOnly;
         $this->method = $isReadOnly ? 'GET' : 'POST';
+        return $this;
+    }
+
+    public function setReadOnlyOverPost(bool $readOnlyOverPost): static
+    {
+        $this->readOnlyOverPost = $readOnlyOverPost;
+        return $this;
+    }
+
+    /**
+     * Idle timeout in seconds; null — the HTTP client default.
+     */
+    public function setTimeout(?float $timeout): static
+    {
+        $this->timeout = $timeout;
         return $this;
     }
 }

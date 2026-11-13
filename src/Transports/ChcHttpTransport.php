@@ -21,6 +21,9 @@ class ChcHttpTransport
      * @var float
      */
     private $last_query_latency;
+    private bool $readOnly = true;
+    private bool $readOnlyOverPost = false;
+    private ?float $timeout = null;
 
     /**
      * ChcHttpTransport constructor.
@@ -40,12 +43,23 @@ class ChcHttpTransport
         // пустой запрос (ping) всегда отпрвляем GET'ом
         $httpMethod = empty($query) ? 'GET' : $this->method;
 
+        // Opt-in: read-only запрос POST'ом с readonly=2 — то же, что сервер выставляет для GET
+        if (!empty($query) && $this->readOnly && $this->readOnlyOverPost) {
+            $httpMethod = 'POST';
+            if (!isset($httpQueryValues['readonly'])) {
+                $httpQueryValues['readonly'] = 2;
+            }
+        }
+
         $streamOpts = array(
             'http'=>array(
                 'method' => $httpMethod,
                 'ignore_errors' => true,
             ),
         );
+        if (null !== $this->timeout) {
+            $streamOpts['http']['timeout'] = $this->timeout;
+        }
 
         $httpHeader = [];
 
@@ -134,7 +148,23 @@ class ChcHttpTransport
 
     public function setReadOnly(bool $isReadOnly): ChcHttpTransport
     {
+        $this->readOnly = $isReadOnly;
         $this->method = $isReadOnly ? 'GET' : 'POST';
+        return $this;
+    }
+
+    public function setReadOnlyOverPost(bool $readOnlyOverPost): static
+    {
+        $this->readOnlyOverPost = $readOnlyOverPost;
+        return $this;
+    }
+
+    /**
+     * Read timeout in seconds; null — default_socket_timeout.
+     */
+    public function setTimeout(?float $timeout): static
+    {
+        $this->timeout = $timeout;
         return $this;
     }
 
