@@ -1,5 +1,5 @@
 # PhpClickHouseClient
-PHP Client for [ClickHouse](https://github.com/yandex/ClickHouse) HTTP interface
+PHP Client for [ClickHouse](https://github.com/ClickHouse/ClickHouse) HTTP interface
 
 # Use examples
 ````php
@@ -9,13 +9,13 @@ $data = (new ChcClient())->getJsonData($query);
 ````php
 $client = new ChcClient();
 
+if (!$client->isAlive()) { // ping() throws ChcException when the server is unreachable
+    throw new Exception('ClickHouse is down.');
+}
+
 try {
-    if ($client->ping()) {
-        $client->readOnly(true);
-        $result = $client->getRaw($query, ChcFormat::JSONEachRow);
-    } else {
-        throw new Exception('ClickHouse is down.');
-    }
+    $client->readOnly(true);
+    $result = $client->getRaw($query, ChcFormat::JSONEachRow);
 }
 catch (ChcException $e) {
     $error = $e->getMessage();
@@ -74,10 +74,39 @@ Errors that ClickHouse sends in the middle of a stream are thrown as `ChcExcepti
 before the error. `insert()` takes the table name as an identifier written into SQL as is — never pass user input.
 `iterate()`, `insert()` and `getJsonPool()` always use Symfony HttpClient; other queries use it only after `setHttpClient()`.
 
+## Query id, summary, sessions, retries, errors
+
+````php
+$client->fetchAll($sql, $params, ['query_id' => 'report-42']); // or let the server generate one
+$client->getLastQueryId();       // X-ClickHouse-Query-Id — for KILL QUERY / system.query_log
+$client->getLastQuerySummary();  // X-ClickHouse-Summary: ['read_rows' => '10', 'read_bytes' => '80', ...]
+
+$client->setSessionId('import-' . bin2hex(random_bytes(8))); // temporary tables, SET
+$client->setRetries(3, 0.5); // read-only queries only: connection errors and HTTP 502/503/504
+
+try {
+    $client->fetchAll('SELECT * FROM missing');
+} catch (ChcConnectionException $e) {   // no HTTP response (extends ChcException)
+} catch (ChcException $e) {
+    $e->getClickHouseErrorCode();  // 60 — ClickHouse error code, null if not a ClickHouse error
+    $e->getHttpStatus();           // 404 — HTTP status, null if there was no response
+    $e->getCode();                 // as before: ClickHouse error code if known, otherwise HTTP status
+}
+````
+
+Notes:
+- With `FORMAT JSON` ClickHouse returns `UInt64`/`Int64` as strings by default
+  (`output_format_json_quote_64bit_integers`; newer servers may differ). Set it explicitly if you rely on the type:
+  `addSettings(['output_format_json_quote_64bit_integers' => 0])`.
+- An error that happens after ClickHouse started streaming the result comes with HTTP 200 and is appended
+  to the body; the client detects it and throws `ChcException`. With `wait_end_of_query=1` the server buffers
+  the result and reports such errors with a proper HTTP status, and `getLastQuerySummary()` is complete —
+  at the cost of memory/latency on the server.
+
 # Install through [Composer](https://getcomposer.org/)
 ````json
 "require": {
-    "seva-code/php-click-house-client": "^1.2.0-dev"
+    "seva-code/php-click-house-client": "1.3.x-dev"
 }
 ````
 

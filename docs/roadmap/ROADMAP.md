@@ -63,17 +63,19 @@
 
 ## Этап 4. Возможности драйвера
 
-- [ ] `query_id` у каждого запроса (свой из настроек или сгенерированный), `getLastQueryId()`.
-- [ ] Сессии: `setSessionId(?string)` для временных таблиц и сессионных настроек.
-- [ ] Статистика запроса из `X-ClickHouse-Summary`: `getLastQuerySummary()`, `ChcResponse::getSummary()`.
-- [ ] Повтор запросов при сетевых ошибках и 502/503/504 — только для read-only запросов:
-      `setRetries(int $count, float $delaySeconds)`. По умолчанию выключено.
-- [ ] Исключения: `ChcConnectionException` (нет HTTP-ответа) как наследник `ChcException`;
-      `getServerCode()` и `getHttpStatus()` отдельно от `getCode()`.
-- [ ] `isAlive(): bool` — проверка доступности без исключений (`ping()` не меняется).
-- [ ] README: документация нового API; нюанс 64-битных целых
-      (`output_format_json_quote_64bit_integers`) и режима `wait_end_of_query=1`.
-- [ ] CHANGELOG.md, git-тег релиза (тег ставит владелец).
+- [x] `query_id`: свой через настройки запроса или сгенерированный сервером; `getLastQueryId()`
+      (из `X-ClickHouse-Query-Id`, без изменения отправляемых запросов) ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+- [x] Сессии: `setSessionId(?string)` для временных таблиц и сессионных настроек ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+- [x] Статистика запроса из `X-ClickHouse-Summary`: `getLastQuerySummary()`, `ChcResponse::getSummary()` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+- [x] Повтор запросов при сетевых ошибках и 502/503/504 — только для read-only запросов:
+      `setRetries(int $count, float $delaySeconds)`. По умолчанию выключено ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+- [x] Исключения: `ChcConnectionException` (нет HTTP-ответа) как наследник `ChcException`;
+      `getClickHouseErrorCode()` и `getHttpStatus()` отдельно от `getCode()` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+- [x] `isAlive(): bool` — проверка доступности без исключений (`ping()` не меняется) ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+- [x] README: документация нового API; нюанс 64-битных целых
+      (`output_format_json_quote_64bit_integers`) и режима `wait_end_of_query=1` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+- [x] CHANGELOG.md ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+- [ ] Git-тег релиза — ставит владелец.
 
 ---
 
@@ -89,7 +91,7 @@
 - [ ] Отказ от транспорта на `file_get_contents` в пользу единственного на Symfony HttpClient.
 - [ ] `Content-Type: text/plain` вместо `application/x-www-form-urlencoded` для POST.
 - [ ] `ping()` возвращает `false` вместо исключения при недоступном сервере.
-- [ ] Новая иерархия исключений по серверным кодам (не только 159/241), отдельные коды.
+- [ ] Новая иерархия исключений по кодам ошибок ClickHouse (не только 159/241), отдельные коды.
 - [ ] Переименование классов без префикса `Chc`.
 - [ ] Перевод комментариев в коде на английский.
 - [ ] Массовое автоформатирование кода (PHP-CS-Fixer / PER-CS).

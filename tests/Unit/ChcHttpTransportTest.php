@@ -3,7 +3,7 @@
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
 use PHPUnit\Framework\Attributes\WithoutErrorHandler;
-use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
 use SevaCode\ClickHouseClient\Tests\TestCase;
 use SevaCode\ClickHouseClient\Transports\ChcHttpTransport;
 
@@ -14,7 +14,7 @@ class ChcHttpTransportTest extends TestCase
     {
         // Port 1 is closed: file_get_contents() fails with a real stream warning.
         $transport = new ChcHttpTransport('http://127.0.0.1:1');
-        $e = $this->caughtException(fn() => @$transport->run($this->request()), ChcException::class);
+        $e = $this->caughtException(fn() => @$transport->run($this->request()), ChcConnectionException::class);
         $this->assertSame(0, $e->getCode());
         $this->assertSame('query-context', $e->getQuery());
         $this->assertNotNull(error_get_last());
@@ -26,7 +26,7 @@ class ChcHttpTransportTest extends TestCase
         // data: wrapper returns a body without $http_response_header.
         trigger_error_silently();
         $transport = new ChcHttpTransport('data:text/plain,Ok.');
-        $e = $this->caughtException(fn() => $transport->run($this->request()), ChcException::class);
+        $e = $this->caughtException(fn() => $transport->run($this->request()), ChcConnectionException::class);
         $this->assertSame('Request failed', $e->getMessage());
         $this->assertSame(0, $e->getCode());
         $this->assertSame('query-context', $e->getQuery());
