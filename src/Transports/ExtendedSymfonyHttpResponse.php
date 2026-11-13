@@ -40,7 +40,7 @@ class ExtendedSymfonyHttpResponse implements ResponseInterface
         $this->decoratedResponse->cancel();
     }
 
-    public function getInfo(string $type = null): mixed
+    public function getInfo(?string $type = null): mixed
     {
         return $this->decoratedResponse->getInfo($type);
     }

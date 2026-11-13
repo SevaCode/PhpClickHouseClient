@@ -110,7 +110,7 @@ class ChcHttpTransport
             );
         }
 
-        $httpStatusLine = $http_response_header[0] ?? '';
+        $httpStatusLine = $http_response_header[0];
 
         if (1 !== preg_match('{HTTP\/\S*\s(\d{3})}', $httpStatusLine, $match)) {
             throw ChcException::create(

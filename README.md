@@ -30,18 +30,24 @@ $latency = $client->getLastQueryLatency();
 }
 ````
 
-# Tests
+# Development
 
-Run the regression tests from the repository root after installing dependencies:
+Documentation for contributors lives in [`docs/`](docs/README.md):
+the [roadmap](docs/roadmap/ROADMAP.md) and [architecture decision records](docs/adr/).
 
-````bash
+## Tests
+
+```bash
 composer install
-php tests/run.php
-````
+composer test                 # unit tests
+composer phpstan              # static analysis
+```
 
-The tests use mocks and do not require a running ClickHouse server or PHPUnit.
-Run the script as a standalone PHP process because it replaces the HTTP client with a test double.
+Integration tests run against a real ClickHouse server:
 
-A test deliberately triggers a stream failure to verify that its details are preserved
-in the exception. A `file_get_contents()` warning is expected in the output.
-A successful run ends with `0 failed` and exits with code `0`.
+```bash
+docker run -d -p 8123:8123 -e CLICKHOUSE_SKIP_USER_SETUP=1 clickhouse/clickhouse-server
+CLICKHOUSE_URL=http://localhost:8123/ composer test-integration
+```
+
+Optional `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` are passed to the client.

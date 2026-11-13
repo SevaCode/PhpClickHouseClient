@@ -18,15 +18,15 @@
 
 Цель: любое изменение проверяется автоматически, в т.ч. против настоящего ClickHouse.
 
-- [ ] `composer.json`: явная зависимость `psr/log`; `symfony/http-client: ^6.2 || ^7.0`.
-- [ ] Совместимость с PHP 8.4: явный nullable в `ExtendedSymfonyHttpResponse::getInfo()`.
-- [ ] PHPUnit в `require-dev`; регрессионные тесты из `tests/run.php` перенесены в PHPUnit.
-- [ ] Интеграционные тесты против реального ClickHouse (группа `integration`,
+- [x] `composer.json`: явная зависимость `psr/log`; `symfony/http-client: ^6.2 || ^7.0`.
+- [x] Совместимость с PHP 8.4: явный nullable в `ExtendedSymfonyHttpResponse::getInfo()`.
+- [x] PHPUnit в `require-dev`; регрессионные тесты из `tests/run.php` перенесены в PHPUnit.
+- [x] Интеграционные тесты против реального ClickHouse (группа `integration`,
       включаются переменной окружения `CLICKHOUSE_URL`).
-- [ ] PHPStan в `require-dev` + `phpstan.neon`, без ошибок на выбранном уровне.
-- [ ] GitHub Actions: матрица PHP 8.1–8.4, юнит-тесты, PHPStan, интеграционные тесты
+- [x] PHPStan в `require-dev` + `phpstan.neon.dist`, уровень 5 без ошибок (повышать постепенно).
+- [x] GitHub Actions: матрица PHP 8.1–8.4, юнит-тесты, PHPStan, интеграционные тесты
       с ClickHouse в service-контейнере.
-- [ ] README: разделы «Разработка» и «Тесты» обновлены.
+- [x] README: разделы «Разработка» и «Тесты» обновлены.
 
 ## Этап 2. Безопасность и корректность
 
