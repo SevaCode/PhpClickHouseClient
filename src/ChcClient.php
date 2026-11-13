@@ -172,8 +172,12 @@ class ChcClient
     }
 
     /**
+     * Sends all queries to ClickHouse in parallel and passes each JSON response
+     * through $callback. The returned array is keyed by the original $queries keys.
+     *
      * @param array<string> $queries
      * @param callable(array $data, array $meta, int $rows, ?int $rows_before_limit_at_least, ?array $statistics, ?array $totals, mixed $extremes, float $start_time): mixed $callback
+     * @return array
      */
     public function getJsonPool(array $queries, callable $callback): array
     {
@@ -186,45 +190,45 @@ class ChcClient
         $transport = (new ChcSymfonyCurlTransport($client))
             ->setReadOnly($this->isReadOnly);
 
-        $responses = array_map(
-            function (string $query) use ($transport, $formatPostfix) {
-                $request = $this->makeRequest($query . $formatPostfix, ChcFormat::JSON);
-                try {
-                    return $transport->request($request);
-                } catch (TransportExceptionInterface $e) {
-                    throw ChcException::create(
-                        message: $e->getMessage(),
-                        previous: $e,
-                        query: $request->getQuery(),
-                    );
-                }
-            }, $queries
-        );
-
-        return array_map(
-            function (ExtendedSymfonyHttpResponse $response) use ($transport, $callback) {
-                try {
-                    $jsonResponse = $transport->response($response)->getResponse();
-                } catch (TransportExceptionInterface $e) {
-                    throw ChcException::create(
-                        message: $e->getMessage(),
-                        code: (int)$response->getInfo('http_code'),
-                        previous: $e,
-                        query: $response->getQuery(),
-                    );
-                }
-                return $callback(
-                    $jsonResponse['data'],
-                    $jsonResponse['meta'],
-                    $jsonResponse['rows'],
-                    $jsonResponse['rows_before_limit_at_least'] ?? null,
-                    $jsonResponse['statistics'] ?? null,
-                    $jsonResponse['totals'] ?? null,
-                    $jsonResponse['extremes'] ?? null,
-                    $response->getInfo('start_time'),
+        $responses = [];
+        foreach ($queries as $key => $query) {
+            $request = $this->makeRequest($query . $formatPostfix, ChcFormat::JSON);
+            try {
+                $responses[$key] = $transport->request($request);
+            } catch (TransportExceptionInterface $e) {
+                throw ChcException::create(
+                    message: $e->getMessage(),
+                    previous: $e,
+                    query: $request->getQuery(),
                 );
-            }, $responses
-        );
+            }
+        }
+
+        $result = [];
+        foreach ($responses as $key => $response) {
+            try {
+                $jsonResponse = $transport->response($response)->getResponse();
+            } catch (TransportExceptionInterface $e) {
+                throw ChcException::create(
+                    message: $e->getMessage(),
+                    code: (int)$response->getInfo('http_code'),
+                    previous: $e,
+                    query: $response->getQuery(),
+                );
+            }
+            $result[$key] = $callback(
+                $jsonResponse['data'],
+                $jsonResponse['meta'],
+                $jsonResponse['rows'],
+                $jsonResponse['rows_before_limit_at_least'] ?? null,
+                $jsonResponse['statistics'] ?? null,
+                $jsonResponse['totals'] ?? null,
+                $jsonResponse['extremes'] ?? null,
+                $response->getInfo('start_time'),
+            );
+        }
+
+        return $result;
 
 //        /**
 //         * @var ExtendedSymfonyHttpResponse $symfonyResponse
