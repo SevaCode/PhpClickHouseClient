@@ -7,7 +7,9 @@
 namespace SevaCode\ClickHouseClient;
 
 use Psr\Log\LoggerInterface;
+use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
 use SevaCode\ClickHouseClient\Responses\ChcResponse;
+use SevaCode\ClickHouseClient\Transports\ChcHeaders;
 use SevaCode\ClickHouseClient\Transports\ChcHttpTransport;
 use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;
 use SevaCode\ClickHouseClient\Transports\ExtendedSymfonyHttpResponse;
@@ -38,6 +40,10 @@ class ChcClient
     private bool $compression = false;
     private ?HttpClientInterface $httpClient = null;
     private ?int $poolConcurrency = null;
+    private int $retries = 0;
+    private float $retryDelay = 0.0;
+    /** @var string[]|null */
+    private ?array $lastHeaderLines = null;
 
     /**
      * @param boolean|null $isReadOnly
@@ -126,6 +132,64 @@ class ChcClient
     }
 
     /**
+     * Opt-in retries of read-only queries on connection errors and HTTP 502/503/504.
+     * Writes (readOnly(false), insert()), timeouts and ClickHouse errors are never retried.
+     */
+    public function setRetries(int $count, float $delaySeconds = 0.5): void
+    {
+        if ($count < 0 || $delaySeconds < 0) {
+            throw new \InvalidArgumentException('Retries and delay must be >= 0');
+        }
+        $this->retries = $count;
+        $this->retryDelay = $delaySeconds;
+    }
+
+    /**
+     * ClickHouse session (session_id) for temporary tables and SET; null — no session.
+     * Queries of one session must not run concurrently (getJsonPool() fails with SESSION_IS_LOCKED).
+     */
+    public function setSessionId(?string $sessionId, ?int $timeoutSeconds = null): void
+    {
+        unset($this->settings['session_id'], $this->settings['session_timeout']);
+        if (null !== $sessionId) {
+            $this->settings['session_id'] = $sessionId;
+            if (null !== $timeoutSeconds) {
+                $this->settings['session_timeout'] = $timeoutSeconds;
+            }
+        }
+    }
+
+    /**
+     * X-ClickHouse-Query-Id of the last successful query (execute, get*, fetch*, write, iterate, insert).
+     */
+    public function getLastQueryId(): ?string
+    {
+        return null === $this->lastHeaderLines ? null : ChcHeaders::queryId($this->lastHeaderLines);
+    }
+
+    /**
+     * X-ClickHouse-Summary of the last successful query, see ChcResponse::getSummary().
+     *
+     * @return array<string, string>|null
+     */
+    public function getLastQuerySummary(): ?array
+    {
+        return null === $this->lastHeaderLines ? null : ChcHeaders::summary($this->lastHeaderLines);
+    }
+
+    /**
+     * ping() without exceptions: false if the server is unreachable or not healthy.
+     */
+    public function isAlive(): bool
+    {
+        try {
+            return $this->ping();
+        } catch (ChcException) {
+            return false;
+        }
+    }
+
+    /**
      * @param string $url
      */
     public function setUrl($url)
@@ -164,6 +228,14 @@ class ChcClient
      */
     protected function runRequest(ChcRequest $request): ChcResponse
     {
+        $this->lastHeaderLines = null;
+        $response = $this->withRetries(fn() => $this->sendRequest($request));
+        $this->lastHeaderLines = $response->getHeaderLines();
+        return $response;
+    }
+
+    private function sendRequest(ChcRequest $request): ChcResponse
+    {
         if (null !== $this->httpClient) {
             $transport = $this->symfonyTransport();
             $timeStart = microtime(true);
@@ -186,6 +258,29 @@ class ChcClient
             return $transport->run($request);
         } finally {
             $this->last_query_latency = $transport->getLastQueryLatency();
+        }
+    }
+
+    /**
+     * @template T
+     * @param callable(): T $send
+     * @return T
+     */
+    private function withRetries(callable $send): mixed
+    {
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                return $send();
+            } catch (ChcException $e) {
+                $retryable = $this->isReadOnly
+                    && ($e instanceof ChcConnectionException || in_array($e->getHttpStatus(), [502, 503, 504], true));
+                if (!$retryable || $attempt >= $this->retries) {
+                    throw $e;
+                }
+                if ($this->retryDelay > 0) {
+                    usleep((int)($this->retryDelay * 1000000));
+                }
+            }
         }
     }
 
@@ -442,15 +537,24 @@ class ChcClient
         $timeStart = microtime(true);
 
         try {
-            $response = $transport->request($request);
-            if (200 !== $response->getStatusCode()) {
-                $transport->response($response); // throws ChcException for non-200
-            }
+            $this->lastHeaderLines = null;
+            $response = $this->withRetries(function () use ($transport, $request) {
+                try {
+                    $response = $transport->request($request);
+                    if (200 !== $response->getStatusCode()) {
+                        $transport->response($response); // throws ChcException for non-200
+                    }
+                    return $response;
+                } catch (TransportExceptionInterface $e) {
+                    throw ChcException::create(message: $e->getMessage(), previous: $e, query: $request->getQuery());
+                }
+            });
             $reader = new Transports\ChcJsonEachRowReader($response, $request->getQuery());
             foreach ($transport->stream($response) as $chunk) {
                 yield from $reader->push($chunk);
             }
             yield from $reader->finish();
+            $this->lastHeaderLines = $response->getInfo('response_headers') ?? [];
         } catch (TransportExceptionInterface $e) {
             throw ChcException::create(message: $e->getMessage(), previous: $e, query: $request->getQuery());
         } finally {
@@ -495,7 +599,10 @@ class ChcClient
         $transport = $this->symfonyTransport();
         $timeStart = microtime(true);
         try {
-            return $transport->response($transport->insert($request, Transports\ChcInsertBody::jsonEachRow($rows, $columns, $this->compression), $this->compression));
+            $this->lastHeaderLines = null;
+            $response = $transport->response($transport->insert($request, Transports\ChcInsertBody::jsonEachRow($rows, $columns, $this->compression), $this->compression));
+            $this->lastHeaderLines = $response->getHeaderLines();
+            return $response;
         } catch (TransportExceptionInterface $e) {
             throw ChcException::create(message: $e->getMessage(), previous: $e, query: $sql);
         } finally {

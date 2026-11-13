@@ -8,6 +8,7 @@ namespace SevaCode\ClickHouseClient\Transports;
 
 use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcRequest;
+use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
 use SevaCode\ClickHouseClient\Responses\ChcResponseFactory;
 
 class ChcHttpTransport
@@ -85,10 +86,7 @@ class ChcHttpTransport
         }
 
         if (false === $body || empty($http_response_header)) {
-            throw ChcException::create(
-                message: error_get_last()['message'] ?? 'Request failed',
-                query: $query,
-            );
+            throw ChcConnectionException::fromMessage(error_get_last()['message'] ?? 'Request failed', $query);
         }
 
         $httpStatusLine = $http_response_header[0];
@@ -120,8 +118,10 @@ class ChcHttpTransport
         // X-ClickHouse-Format — эхо реального формата ответа от сервера, надёжнее
         // getReturnFormat(): FORMAT можно вписать в query вручную, а execute()
         // не дописывает FORMAT-клаузу. Заголовка нет у DDL/ping — fallback на request.
-        return (new ChcResponseFactory(ChcErrorDetector::responseFormat($http_response_header) ?? $request->getReturnFormat()))
+        $response = (new ChcResponseFactory(ChcErrorDetector::responseFormat($http_response_header) ?? $request->getReturnFormat()))
             ->make($body, $httpStatus, $query);
+        $response->setHeaderLines($http_response_header);
+        return $response;
     }
 
     public function setReadOnly(bool $isReadOnly): ChcHttpTransport

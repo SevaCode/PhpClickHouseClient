@@ -63,17 +63,19 @@
 
 ## Этап 4. Возможности драйвера
 
-- [ ] `query_id` у каждого запроса (свой из настроек или сгенерированный), `getLastQueryId()`.
-- [ ] Сессии: `setSessionId(?string)` для временных таблиц и сессионных настроек.
-- [ ] Статистика запроса из `X-ClickHouse-Summary`: `getLastQuerySummary()`, `ChcResponse::getSummary()`.
-- [ ] Повтор запросов при сетевых ошибках и 502/503/504 — только для read-only запросов:
+- [x] `query_id`: свой через настройки запроса или сгенерированный сервером; `getLastQueryId()`
+      (из `X-ClickHouse-Query-Id`, без изменения отправляемых запросов).
+- [x] Сессии: `setSessionId(?string)` для временных таблиц и сессионных настроек.
+- [x] Статистика запроса из `X-ClickHouse-Summary`: `getLastQuerySummary()`, `ChcResponse::getSummary()`.
+- [x] Повтор запросов при сетевых ошибках и 502/503/504 — только для read-only запросов:
       `setRetries(int $count, float $delaySeconds)`. По умолчанию выключено.
-- [ ] Исключения: `ChcConnectionException` (нет HTTP-ответа) как наследник `ChcException`;
+- [x] Исключения: `ChcConnectionException` (нет HTTP-ответа) как наследник `ChcException`;
       `getServerCode()` и `getHttpStatus()` отдельно от `getCode()`.
-- [ ] `isAlive(): bool` — проверка доступности без исключений (`ping()` не меняется).
-- [ ] README: документация нового API; нюанс 64-битных целых
+- [x] `isAlive(): bool` — проверка доступности без исключений (`ping()` не меняется).
+- [x] README: документация нового API; нюанс 64-битных целых
       (`output_format_json_quote_64bit_integers`) и режима `wait_end_of_query=1`.
-- [ ] CHANGELOG.md, git-тег релиза (тег ставит владелец).
+- [x] CHANGELOG.md.
+- [ ] Git-тег релиза — ставит владелец.
 
 ---
 

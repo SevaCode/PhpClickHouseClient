@@ -6,9 +6,11 @@
 
 namespace SevaCode\ClickHouseClient;
 
+use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
 use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
 class ChcException extends \Exception
 {
@@ -16,9 +18,14 @@ class ChcException extends \Exception
      * @var string
      */
     private $query;
+    private ?int $httpStatus = null;
+    private ?int $serverCode = null;
 
     public static function create(string $message = '', int|string $code = 0, ?\Throwable $previous = null, ?string $query = null): self
     {
+        $httpStatus = is_numeric($code) && $code >= 100 && $code <= 599 ? (int)$code : null;
+        $serverCode = null;
+
         // Входной $code может быть HTTP-статусом. Серверный Code: N точнее и имеет
         // приоритет над ним и над символическими названиями ошибок в тексте.
         // Формат подтверждён getExceptionMessageAndPattern() в ClickHouse (src/Common/Exception.cpp):
@@ -27,15 +34,15 @@ class ChcException extends \Exception
         // Это best-effort поиск: Code: N должен быть в начале сообщения или строки (допустим отступ);
         // сама регулярка не доказывает, что найденная строка является ошибкой ClickHouse.
         if (preg_match('/^[\t ]*Code:[\t ]*(\d+)\b/m', $message, $match)) {
-            $code = (int)$match[1];
+            $code = $serverCode = (int)$match[1];
         } elseif (!($previous instanceof TimeoutExceptionInterface)) {
             // Запасной поиск по названию: только без Code: N и НЕ для клиентского Symfony-таймаута.
             // Для клиентского Symfony-таймаута сохраняем переданный код:
             // таймаут HTTP-клиента не означает серверную ошибку ClickHouse с кодом 159.
             if (str_contains($message, 'MEMORY_LIMIT_EXCEEDED')) {
-                $code = 241;
+                $code = $serverCode = 241;
             } elseif (str_contains($message, 'TIMEOUT_EXCEEDED')) {
-                $code = 159;
+                $code = $serverCode = 159;
             }
         }
 
@@ -45,6 +52,8 @@ class ChcException extends \Exception
             $e = new ChcTimeoutExceededException($message, (int)$code, $previous);
         } elseif ($code == 241) {
             $e = new ChcMemoryLimitExceededException($message, (int)$code, $previous);
+        } elseif ($previous instanceof TransportExceptionInterface && null === $serverCode) {
+            $e = new ChcConnectionException($message, (int)$code, $previous);
         } else {
             $e = new self($message, (int)$code, $previous);
         }
@@ -52,8 +61,27 @@ class ChcException extends \Exception
         if ($query !== null) {
             $e->setQuery($query);
         }
+        $e->httpStatus = $httpStatus;
+        $e->serverCode = $serverCode;
 
         return $e;
+    }
+
+    /**
+     * HTTP status of the ClickHouse response (200 for errors sent mid-stream), null — no response.
+     */
+    public function getHttpStatus(): ?int
+    {
+        return $this->httpStatus;
+    }
+
+    /**
+     * ClickHouse error code ('Code: N.' in the message), null — not a server error.
+     * getCode() keeps the old behaviour: server code if known, otherwise HTTP status.
+     */
+    public function getServerCode(): ?int
+    {
+        return $this->serverCode;
     }
 
     /**

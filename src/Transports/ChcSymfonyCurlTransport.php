@@ -127,8 +127,10 @@ class ChcSymfonyCurlTransport
         // X-ClickHouse-Format — эхо реального формата ответа от сервера, надёжнее
         // getReturnFormat(): FORMAT можно вписать в query вручную, а execute()
         // не дописывает FORMAT-клаузу. Заголовка нет у DDL/ping — fallback на request.
-        return (new ChcResponseFactory(ChcErrorDetector::responseFormat($headerLines) ?? $response->getRequest()->getReturnFormat()))
+        $chcResponse = (new ChcResponseFactory(ChcErrorDetector::responseFormat($headerLines) ?? $response->getRequest()->getReturnFormat()))
             ->make($body, $httpStatus, $response->getQuery());
+        $chcResponse->setHeaderLines($headerLines);
+        return $chcResponse;
     }
 
     public function setReadOnly(bool $isReadOnly): static
