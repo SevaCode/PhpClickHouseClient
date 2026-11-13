@@ -14,7 +14,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 class ChcSymfonyCurlTransportTest extends TestCase
 {
-    public function testResponseFailuresPreserveStatusServerCodeAndContext(): void
+    public function testResponseFailuresPreserveStatusClickHouseErrorCodeAndContext(): void
     {
         $memoryBody = '{"data":[{"x":1}]' . "\nCode: 241. DB::Exception: query failed";
         $timeoutBody = '{"data":[{"x":1}]' . "\nCode: 159. DB::Exception: query failed";

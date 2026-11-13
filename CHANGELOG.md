@@ -14,7 +14,7 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 - Streaming `iterate()` (JSONEachRow) and `insert()` (streamed, optionally gzip'ed body).
 - `getLastQueryId()`, `getLastQuerySummary()`, `ChcResponse::getQueryId()/getSummary()/getHeaderLines()`.
 - `setSessionId()`, opt-in `setRetries()` for read-only queries, `isAlive()`.
-- `ChcConnectionException` (extends `ChcException`), `ChcException::getServerCode()/getHttpStatus()`.
+- `ChcConnectionException` (extends `ChcException`), `ChcException::getClickHouseErrorCode()/getHttpStatus()`.
 - PHPUnit, PHPStan, integration tests against ClickHouse 24.1 / 24.8 / latest, GitHub Actions CI.
 - `docs/`: roadmap and ADRs.
 

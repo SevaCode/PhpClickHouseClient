@@ -71,7 +71,7 @@
 - [x] Повтор запросов при сетевых ошибках и 502/503/504 — только для read-only запросов:
       `setRetries(int $count, float $delaySeconds)`. По умолчанию выключено ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
 - [x] Исключения: `ChcConnectionException` (нет HTTP-ответа) как наследник `ChcException`;
-      `getServerCode()` и `getHttpStatus()` отдельно от `getCode()` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+      `getClickHouseErrorCode()` и `getHttpStatus()` отдельно от `getCode()` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
 - [x] `isAlive(): bool` — проверка доступности без исключений (`ping()` не меняется) ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
 - [x] README: документация нового API; нюанс 64-битных целых
       (`output_format_json_quote_64bit_integers`) и режима `wait_end_of_query=1` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
@@ -99,7 +99,7 @@
 - [ ] 5. Иммутабельный клиент (`with*()`).
 - [ ] 6. Чтение по умолчанию POST + `readonly=2`, `Content-Type: text/plain`.
 - [ ] 7. `ping(): bool` без исключений.
-- [ ] 8. Иерархия исключений, `getCode()` = серверный код.
+- [ ] 8. Иерархия исключений, `getCode()` = код ошибки ClickHouse.
 - [ ] 9. `pool()` с объектами результата вместо callback `getJsonPool()`.
 - [ ] 10. Минимум PHP 8.2 / Symfony 6.4.
 - [ ] 11. Переименование классов без префикса `Chc` (рекомендация — не делать).

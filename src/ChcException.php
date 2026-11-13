@@ -19,12 +19,12 @@ class ChcException extends \Exception
      */
     private $query;
     private ?int $httpStatus = null;
-    private ?int $serverCode = null;
+    private ?int $clickHouseErrorCode = null;
 
     public static function create(string $message = '', int|string $code = 0, ?\Throwable $previous = null, ?string $query = null): self
     {
         $httpStatus = is_numeric($code) && $code >= 100 && $code <= 599 ? (int)$code : null;
-        $serverCode = null;
+        $clickHouseErrorCode = null;
 
         // Входной $code может быть HTTP-статусом. Серверный Code: N точнее и имеет
         // приоритет над ним и над символическими названиями ошибок в тексте.
@@ -34,15 +34,15 @@ class ChcException extends \Exception
         // Это best-effort поиск: Code: N должен быть в начале сообщения или строки (допустим отступ);
         // сама регулярка не доказывает, что найденная строка является ошибкой ClickHouse.
         if (preg_match('/^[\t ]*Code:[\t ]*(\d+)\b/m', $message, $match)) {
-            $code = $serverCode = (int)$match[1];
+            $code = $clickHouseErrorCode = (int)$match[1];
         } elseif (!($previous instanceof TimeoutExceptionInterface)) {
             // Запасной поиск по названию: только без Code: N и НЕ для клиентского Symfony-таймаута.
             // Для клиентского Symfony-таймаута сохраняем переданный код:
             // таймаут HTTP-клиента не означает серверную ошибку ClickHouse с кодом 159.
             if (str_contains($message, 'MEMORY_LIMIT_EXCEEDED')) {
-                $code = $serverCode = 241;
+                $code = $clickHouseErrorCode = 241;
             } elseif (str_contains($message, 'TIMEOUT_EXCEEDED')) {
-                $code = $serverCode = 159;
+                $code = $clickHouseErrorCode = 159;
             }
         }
 
@@ -52,7 +52,7 @@ class ChcException extends \Exception
             $e = new ChcTimeoutExceededException($message, (int)$code, $previous);
         } elseif ($code == 241) {
             $e = new ChcMemoryLimitExceededException($message, (int)$code, $previous);
-        } elseif ($previous instanceof TransportExceptionInterface && null === $serverCode) {
+        } elseif ($previous instanceof TransportExceptionInterface && null === $clickHouseErrorCode) {
             $e = new ChcConnectionException($message, (int)$code, $previous);
         } else {
             $e = new self($message, (int)$code, $previous);
@@ -62,7 +62,7 @@ class ChcException extends \Exception
             $e->setQuery($query);
         }
         $e->httpStatus = $httpStatus;
-        $e->serverCode = $serverCode;
+        $e->clickHouseErrorCode = $clickHouseErrorCode;
 
         return $e;
     }
@@ -76,12 +76,12 @@ class ChcException extends \Exception
     }
 
     /**
-     * ClickHouse error code ('Code: N.' in the message), null — not a server error.
-     * getCode() keeps the old behaviour: server code if known, otherwise HTTP status.
+     * ClickHouse error code ('Code: N.' in the message), null — not a ClickHouse error.
+     * getCode() keeps the old behaviour: ClickHouse error code if known, otherwise HTTP status.
      */
-    public function getServerCode(): ?int
+    public function getClickHouseErrorCode(): ?int
     {
-        return $this->serverCode;
+        return $this->clickHouseErrorCode;
     }
 
     /**

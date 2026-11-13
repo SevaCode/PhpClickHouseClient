@@ -10,7 +10,7 @@ use Symfony\Component\HttpClient\Exception\TimeoutException;
 
 class ChcExceptionTest extends TestCase
 {
-    public function testServerCodesSymbolicFallbacksAndHttpFallback(): void
+    public function testClickHouseErrorCodesSymbolicFallbacksAndHttpFallback(): void
     {
         $query = 'query-context';
         $previous = new \RuntimeException('original');
@@ -39,7 +39,7 @@ class ChcExceptionTest extends TestCase
         }
     }
 
-    public function testClientTimeoutPreservesContextAndDoesNotFabricateServerCode(): void
+    public function testClientTimeoutPreservesContextAndDoesNotFabricateClickHouseErrorCode(): void
     {
         $previous = new TimeoutException('TIMEOUT_EXCEEDED');
         $message = $previous->getMessage();

@@ -35,18 +35,18 @@ class DriverFeaturesTest extends TestCase
     {
         $e = ChcException::create('Code: 60. DB::Exception: Unknown table', 404);
         $this->assertSame(60, $e->getCode());
-        $this->assertSame(60, $e->getServerCode());
+        $this->assertSame(60, $e->getClickHouseErrorCode());
         $this->assertSame(404, $e->getHttpStatus());
 
         $e = ChcException::create('Bad gateway', 502);
         $this->assertSame(502, $e->getCode());
-        $this->assertNull($e->getServerCode());
+        $this->assertNull($e->getClickHouseErrorCode());
         $this->assertSame(502, $e->getHttpStatus());
 
         $e = ChcException::create('Couldn\'t connect', previous: new TransportException('x'));
         $this->assertInstanceOf(ChcConnectionException::class, $e);
         $this->assertNull($e->getHttpStatus());
-        $this->assertNull($e->getServerCode());
+        $this->assertNull($e->getClickHouseErrorCode());
 
         $e = ChcException::create('Idle timeout', previous: new TimeoutException('x'));
         $this->assertInstanceOf(ChcTimeoutExceededException::class, $e);

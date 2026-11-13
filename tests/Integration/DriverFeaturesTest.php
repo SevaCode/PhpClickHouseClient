@@ -48,7 +48,7 @@ class DriverFeaturesTest extends IntegrationTestCase
 
         $client->setSessionId(null);
         $e = $this->caughtException(fn() => $client->fetchOne('SELECT x FROM tmp'), ChcException::class);
-        $this->assertSame(60, $e->getServerCode()); // UNKNOWN_TABLE
+        $this->assertSame(60, $e->getClickHouseErrorCode()); // UNKNOWN_TABLE
         $this->assertSame(404, $e->getHttpStatus());
     }
 
