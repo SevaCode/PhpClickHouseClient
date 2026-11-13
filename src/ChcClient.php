@@ -13,6 +13,7 @@ use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;
 use SevaCode\ClickHouseClient\Transports\ExtendedSymfonyHttpResponse;
 use Symfony\Component\HttpClient\HttpClient as SymfonyHttpClient;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class ChcClient
 {
@@ -149,7 +150,8 @@ class ChcClient
     }
 
     /**
-     * @return true
+     * @return bool
+     * @throws ChcException when the server is unreachable
      */
     public function ping()
     {
@@ -183,9 +185,7 @@ class ChcClient
     {
         $formatPostfix = $this->getQueryFormatPostfix(ChcFormat::JSON);
 
-        $client = SymfonyHttpClient::create([
-            'base_uri' => $this->url,
-        ]);
+        $client = $this->createHttpClient();
 
         $transport = (new ChcSymfonyCurlTransport($client))
             ->setReadOnly($this->isReadOnly);
@@ -274,6 +274,16 @@ class ChcClient
 //        }
 //
 //        return $result;
+    }
+
+    /**
+     * HTTP client for concurrent requests (getJsonPool).
+     */
+    protected function createHttpClient(): HttpClientInterface
+    {
+        return SymfonyHttpClient::create([
+            'base_uri' => $this->url,
+        ]);
     }
 
     public function setSqlLogger(?LoggerInterface $sqlLogger): void

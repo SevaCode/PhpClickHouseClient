@@ -18,15 +18,17 @@
 
 Цель: любое изменение проверяется автоматически, в т.ч. против настоящего ClickHouse.
 
-- [ ] `composer.json`: явная зависимость `psr/log`; `symfony/http-client: ^6.2 || ^7.0`.
-- [ ] Совместимость с PHP 8.4: явный nullable в `ExtendedSymfonyHttpResponse::getInfo()`.
-- [ ] PHPUnit в `require-dev`; регрессионные тесты из `tests/run.php` перенесены в PHPUnit.
-- [ ] Интеграционные тесты против реального ClickHouse (группа `integration`,
-      включаются переменной окружения `CLICKHOUSE_URL`).
-- [ ] PHPStan в `require-dev` + `phpstan.neon`, без ошибок на выбранном уровне.
-- [ ] GitHub Actions: матрица PHP 8.1–8.4, юнит-тесты, PHPStan, интеграционные тесты
-      с ClickHouse в service-контейнере.
-- [ ] README: разделы «Разработка» и «Тесты» обновлены.
+- [x] `composer.json`: явная зависимость `psr/log`; `symfony/http-client: ^6.2 || ^7.0` ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] Совместимость с PHP 8.4: явный nullable в `ExtendedSymfonyHttpResponse::getInfo()` ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] PHPUnit в `require-dev`; регрессионные тесты из `tests/run.php` перенесены в PHPUnit ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] Интеграционные тесты против реального ClickHouse (группа `integration`,
+      включаются переменной окружения `CLICKHOUSE_URL`) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] PHPStan в `require-dev` + `phpstan.neon.dist`, уровень 5 без ошибок (повышать постепенно) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] GitHub Actions: матрица PHP 8.1–8.4, юнит-тесты, PHPStan, интеграционные тесты
+      с ClickHouse в service-контейнере ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] README: разделы «Разработка» и «Тесты» обновлены ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] Детекция ошибок посреди стриминга исправлена по итогам интеграционных тестов:
+      блок `__exception__` с `X-ClickHouse-Exception-Tag` (ClickHouse 25.x+) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
 
 ## Этап 2. Безопасность и корректность
 
