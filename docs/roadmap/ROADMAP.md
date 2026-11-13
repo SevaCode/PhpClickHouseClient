@@ -27,8 +27,8 @@
 - [x] GitHub Actions: матрица PHP 8.1–8.4, юнит-тесты, PHPStan, интеграционные тесты
       с ClickHouse в service-контейнере ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
 - [x] README: разделы «Разработка» и «Тесты» обновлены ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
-- [x] Детекция ошибок посреди стриминга исправлена по итогам интеграционных тестов: plain-text
-      сразу после JSON-данных (ClickHouse 23.x) и блок `__exception__` с `X-ClickHouse-Exception-Tag` (25.x+) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] Детекция ошибок посреди стриминга исправлена по итогам интеграционных тестов:
+      блок `__exception__` с `X-ClickHouse-Exception-Tag` (ClickHouse 25.x+) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
 
 ## Этап 2. Безопасность и корректность
 

@@ -155,9 +155,8 @@ class ChcErrorDetector
         $format = self::responseFormat($headerLines);
         if (null !== $format) {
             return match ($format) {
-                // Эти форматы встраивают exception как поле/строку "exception";
-                // старые серверы (23.x) дописывают plain-text сразу после данных
-                'JSON', 'JSONCompact', 'JSONStrings', 'JSONEachRow' => ['json', 'plain'],
+                // Эти форматы встраивают exception как поле/строку "exception"
+                'JSON', 'JSONCompact', 'JSONStrings', 'JSONEachRow' => ['json'],
                 'XML' => ['xml'],
                 // JSONCompactEachRow и будущие JSON*-форматы — все сигнатуры,
                 // способ встраивания для них не проверен
@@ -172,7 +171,7 @@ class ChcErrorDetector
         }
         // application/json, application/x-ndjson и прочие *json*
         if (str_contains($contentType, 'json')) {
-            return ['json', 'plain'];
+            return ['json'];
         }
         if (str_contains($contentType, 'xml')) {
             return ['xml'];
