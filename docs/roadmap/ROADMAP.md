@@ -10,9 +10,9 @@
 
 ## Этап 0. Документация и процесс
 
-- [x] Структура `docs/` (`roadmap/`, `adr/`), шаблон ADR.
-- [x] ADR-0001: политика обратной совместимости.
-- [x] Этот документ.
+- [x] Структура `docs/` (`roadmap/`, `adr/`), шаблон ADR ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
+- [x] ADR-0001: политика обратной совместимости ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
+- [x] Этот документ ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
 
 ## Этап 1. Инфраструктура и качество
 
