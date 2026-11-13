@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        clickhouse: ['24.8', 'latest']
+        clickhouse: ['24.1', '24.8', 'latest']
     services:
       clickhouse:
         image: clickhouse/clickhouse-server:${{ matrix.clickhouse }}
