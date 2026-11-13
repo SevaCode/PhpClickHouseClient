@@ -84,8 +84,8 @@
 
 - [ ] Смержить PR #1–#5, тег `1.4.0` (владелец).
 - [ ] Ветка `1.x` от `1.4.0` — только багфиксы; `master` → 2.0, branch-alias `2.0.x-dev`.
-- [x] [ADR-0002](../adr/0002-version-2.md): список ломающих изменений 2.0 (статус «предложено»).
-- [x] Черновик [`UPGRADE-2.0.md`](../../UPGRADE-2.0.md).
+- [x] [ADR-0002](../adr/0002-version-2.md): список ломающих изменений 2.0 (статус «предложено») ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
+- [x] Черновик [`UPGRADE-2.0.md`](../../UPGRADE-2.0.md) ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
 - [ ] `@deprecated` в 1.x для всего, что удаляется по принятым пунктам ADR-0002.
 
 ## Этап 5. Версия 2.0 (нарушает обратную совместимость)
