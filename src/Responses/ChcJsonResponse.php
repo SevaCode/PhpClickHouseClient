@@ -34,6 +34,14 @@ class ChcJsonResponse extends ChcResponse
             );
         }
 
+        if (!empty($response['exception'])) {
+            throw ChcException::create(
+                message: (string)$response['exception'],
+                code: $this->httpStatus,
+                query: $this->query,
+            );
+        }
+
         return $response;
     }
 }

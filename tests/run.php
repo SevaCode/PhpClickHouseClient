@@ -7,6 +7,7 @@ use SevaCode\ClickHouseClient\ChcRequest;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
 use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use SevaCode\ClickHouseClient\Responses\ChcResponse;
+use SevaCode\ClickHouseClient\Transports\ChcErrorDetector;
 use SevaCode\ClickHouseClient\Transports\ChcHttpTransport;
 use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;
 use Symfony\Component\HttpClient\Exception\TimeoutException;
@@ -119,6 +120,7 @@ require __DIR__ . '/stream_functions.php';
             [$memoryBody, 200, ChcMemoryLimitExceededException::class, $memoryBody, 241],
             [$timeoutBody, 200, ChcTimeoutExceededException::class, $timeoutBody, 159],
             ['Code: 60. DB::Exception: Unknown table', 500, ChcException::class, 'Code: 60. DB::Exception: Unknown table', 60],
+            ["1\t2\nCode: 395. DB::Exception: boom (FOO) (version 1.0 (official build))", 200, ChcException::class, 'Code: 395. DB::Exception: boom (FOO) (version 1.0 (official build))', 395],
             ['Proxy error', 502, ChcException::class, 'Proxy error', 502],
             ['', 503, ChcException::class, 'Unexpected response status: 503', 503],
         ];
@@ -128,6 +130,123 @@ require __DIR__ . '/stream_functions.php';
             same($code, $e->getCode());
             same('query-context', $e->getQuery());
         }
+    };
+    $tests['error detector finds mid-stream exceptions in body tail'] = function () {
+        // JSON: поле "exception" перед закрывающей скобкой
+        $e = ChcErrorDetector::detect(
+            '{"data":[{"x":1}],"exception":"Code: 241. DB::Exception: Memory limit (MEMORY_LIMIT_EXCEEDED)"}',
+            200, ['json'], 'q',
+        );
+        same(true, $e instanceof ChcMemoryLimitExceededException);
+        same(241, $e->getCode());
+        same('q', $e->getQuery());
+
+        // JSONEachRow: exception отдельной строкой в конце — тот же json-паттерн
+        $e = ChcErrorDetector::detect(
+            "{\"a\":1}\n{\"exception\": \"Code: 159. DB::Exception: Timeout (TIMEOUT_EXCEEDED)\"}\n",
+            200, ['json'], 'q',
+        );
+        same(true, $e instanceof ChcTimeoutExceededException);
+
+        // Текстовый формат: plain-text trailer в конце тела
+        $e = ChcErrorDetector::detect(
+            "1\t2\n3\t4\nCode: 395. DB::Exception: boom (FOO) (version 24.1.4.20 (official build))\n",
+            200, ['plain'], 'q',
+        );
+        same(true, $e instanceof ChcException);
+        same(395, $e->getCode());
+        same(false, $e instanceof ChcMemoryLimitExceededException);
+
+        // Тело больше 4 КБ: exception в последних 4 КБ по-прежнему находится
+        $e = ChcErrorDetector::detect(
+            str_repeat("1\t2\n", 2000) . "Code: 395. DB::Exception: boom (FOO) (version 1.0)\n",
+            200, ['plain'], 'q',
+        );
+        same(395, $e->getCode());
+
+        // XML: <exception>...</exception> перед </result>
+        $e = ChcErrorDetector::detect(
+            '<result><row>1</row><exception>Code: 395. DB::Exception: boom (FOO) (version 1.0)</exception></result>',
+            200, ['xml'], 'q',
+        );
+        same(395, $e->getCode());
+        same('Code: 395. DB::Exception: boom (FOO) (version 1.0)', $e->getMessage());
+
+        // Чужая сигнатура не проверяется: plain-trailer при checks=['json'] — null
+        same(null, ChcErrorDetector::detect(
+            "1\t2\nCode: 395. DB::Exception: boom (FOO) (version 1.0)",
+            200, ['json'], 'q',
+        ));
+
+        // Чистые ответы — null при любых checks
+        foreach ([['json'], ['plain'], ['xml'], ['json', 'plain', 'xml']] as $checks) {
+            same(null, ChcErrorDetector::detect('{"data":[{"x":1}],"rows":1}', 200, $checks, 'q'));
+            same(null, ChcErrorDetector::detect("1\t2\n3\t4\n", 200, $checks, 'q'));
+        }
+
+        // Строка данных, похожая на исключение, но JSON заканчивается на '}' — не срабатывает
+        same(null, ChcErrorDetector::detect(
+            '{"data":[{"v":"Code: 1. DB::Exception: fake (FOO) (version 1.0)"}],"rows":1}',
+            200, ['json', 'plain'], 'q',
+        ));
+    };
+    $tests['error detector picks signature by response headers'] = function () {
+        $jsonError = '{"data":[],"exception":"Code: 241. DB::Exception: mem (MEMORY_LIMIT_EXCEEDED)"}';
+        $tsvError = "1\t2\nCode: 395. DB::Exception: boom (FOO) (version 1.0)";
+        $xmlError = '<result><exception>Code: 395. DB::Exception: boom</exception></result>';
+        $ok = 'HTTP/1.1 200 OK';
+
+        // X-ClickHouse-Format сужает выбор сигнатуры
+        caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok, 'X-ClickHouse-Format: TabSeparated'], 'q'), ChcException::class);
+        caughtException(fn() => ChcErrorDetector::throwIfError($jsonError, 200, [$ok, 'X-ClickHouse-Format: JSON'], 'q'), ChcMemoryLimitExceededException::class);
+        caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, [$ok, 'X-ClickHouse-Format: XML'], 'q'), ChcException::class);
+        // ...и отсекает чужие: JSON-ошибка при формате TabSeparated не детектится
+        ChcErrorDetector::throwIfError($jsonError, 200, [$ok, 'X-ClickHouse-Format: TabSeparated'], 'q');
+
+        // Без X-ClickHouse-Format семейство определяется по Content-Type
+        caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok, 'Content-Type: text/tab-separated-values; charset=UTF-8'], 'q'), ChcException::class);
+        caughtException(fn() => ChcErrorDetector::throwIfError($jsonError, 200, [$ok, 'Content-Type: application/json'], 'q'), ChcMemoryLimitExceededException::class);
+        caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, [$ok, 'Content-Type: application/xml'], 'q'), ChcException::class);
+
+        // Ни формата, ни Content-Type — все сигнатуры
+        caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok], 'q'), ChcException::class);
+        caughtException(fn() => ChcErrorDetector::throwIfError($jsonError, 200, [], 'q'), ChcMemoryLimitExceededException::class);
+
+        // Неоднозначный Content-Type (text/plain) — все сигнатуры
+        caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, ['Content-Type: text/plain'], 'q'), ChcException::class);
+    };
+    $tests['error detector unifies status and tail errors'] = function () {
+        // не-200 + пустое тело: статус-строка сохраняется в сообщении
+        try {
+            ChcErrorDetector::throwIfError('', 503, ['HTTP/1.1 503 Service Unavailable'], 'q');
+            throw new \LogicException('Expected ChcException');
+        } catch (ChcException $e) {
+            same('Unexpected response status: HTTP/1.1 503 Service Unavailable', $e->getMessage());
+            same(503, $e->getCode());
+            same('q', $e->getQuery());
+        }
+
+        // не-200 + пустое тело + нет статус-строки: fallback на числовой код
+        try {
+            ChcErrorDetector::throwIfError('', 503, [], 'q');
+            throw new \LogicException('Expected ChcException');
+        } catch (ChcException $e) {
+            same('Unexpected response status: 503', $e->getMessage());
+            same(503, $e->getCode());
+        }
+
+        // не-200 + тело: тело становится сообщением как раньше
+        try {
+            ChcErrorDetector::throwIfError('Code: 60. DB::Exception: Unknown table', 500, ['HTTP/1.1 500 Internal Server Error'], 'q');
+            throw new \LogicException('Expected ChcException');
+        } catch (ChcException $e) {
+            same('Code: 60. DB::Exception: Unknown table', $e->getMessage());
+            same(60, $e->getCode());
+        }
+
+        // 200 + чистое тело — не бросает
+        ChcErrorDetector::throwIfError('{"data":[]}', 200, ['HTTP/1.1 200 OK'], 'q');
+        ChcErrorDetector::throwIfError("1\t2\n", 200, [], 'q');
     };
     $tests['native stream failure preserves stream error context'] = function () {
         $transport = new ChcHttpTransport('http://unused.invalid');
@@ -178,6 +297,33 @@ require __DIR__ . '/stream_functions.php';
         same($e->getPrevious()->getMessage(), $e->getMessage());
     };
 
+    $tests['response format comes from X-ClickHouse-Format header'] = function () {
+        $make = function (array $info) {
+            $transport = new ChcSymfonyCurlTransport(new MockHttpClient(new MockResponse('{"data":[{"x":1}],"rows":1}', $info)));
+            $req = (new ChcRequest())->setSettings([])->setQuery('SELECT 1 FORMAT JSON')->setReturnFormat('');
+            return $transport->response($transport->request($req));
+        };
+
+        // Заголовок есть — реальный формат сервера важнее returnFormat
+        $response = $make(['http_code' => 200, 'response_headers' => [0 => 'HTTP/1.1 200 OK', 'x-clickhouse-format' => 'JSON']]);
+        same(ChcFormat::JSON, $response->getFormat());
+        same([['x' => 1]], $response->getResponse()['data']);
+
+        // Заголовка нет (DDL/ping/старый сервер) — fallback на returnFormat
+        $response = $make(['http_code' => 200]);
+        same('', $response->getFormat());
+        same('{"data":[{"x":1}],"rows":1}', $response->getResponse());
+
+        // Сервер сказал TabSeparated — сырой ответ, не JSON-парсер
+        $transport = new ChcSymfonyCurlTransport(new MockHttpClient(new MockResponse('{"data":[]}', [
+            'http_code' => 200,
+            'response_headers' => [0 => 'HTTP/1.1 200 OK', 'x-clickhouse-format' => 'TabSeparated'],
+        ])));
+        $req = (new ChcRequest())->setSettings([])->setQuery('SELECT 1')->setReturnFormat('');
+        $response = $transport->response($transport->request($req));
+        same('', $response->getFormat());
+        same('{"data":[]}', $response->getResponse());
+    };
     $tests['symfony transport forwards method and settings'] = function () {
         $settings = ['database' => 'analytics', 'max_threads' => 2, 'user' => 'alice', 'password' => 'secret'];
         foreach ([[true, 'GET'], [false, 'POST']] as [$readOnly, $method]) {

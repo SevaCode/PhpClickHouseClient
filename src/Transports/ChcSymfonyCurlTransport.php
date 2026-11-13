@@ -6,7 +6,6 @@
 
 namespace SevaCode\ClickHouseClient\Transports;
 
-use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcRequest;
 use SevaCode\ClickHouseClient\Responses\ChcResponse;
 use SevaCode\ClickHouseClient\Responses\ChcResponseFactory;
@@ -92,18 +91,16 @@ class ChcSymfonyCurlTransport
 
         $httpStatus = $response->getStatusCode();
 
-        if (200 != $httpStatus) {
-            if (empty($body)) {
-                $body = 'Unexpected response status: ' . $httpStatus;
-            }
-            throw ChcException::create(
-                message: $body,
-                code: $httpStatus,
-                query: $response->getQuery(),
-            );
-        }
+        // Сырые строки заголовков — из них ChcErrorDetector берёт статус-строку
+        // и X-ClickHouse-Format. См. ChcErrorDetector.
+        $headerLines = $response->getInfo('response_headers') ?? [];
 
-        return (new ChcResponseFactory($response->getRequest()->getReturnFormat()))
+        ChcErrorDetector::throwIfError($body, $httpStatus, $headerLines, $response->getQuery());
+
+        // X-ClickHouse-Format — эхо реального формата ответа от сервера, надёжнее
+        // getReturnFormat(): FORMAT можно вписать в query вручную, а execute()
+        // не дописывает FORMAT-клаузу. Заголовка нет у DDL/ping — fallback на request.
+        return (new ChcResponseFactory(ChcErrorDetector::responseFormat($headerLines) ?? $response->getRequest()->getReturnFormat()))
             ->make($body, $httpStatus, $response->getQuery());
     }
 

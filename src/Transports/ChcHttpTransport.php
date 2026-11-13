@@ -121,18 +121,14 @@ class ChcHttpTransport
 
         $httpStatus = (int)$match[1];
 
-        if (200 != $httpStatus) {
-            if (empty($body)) {
-                $body = 'Unexpected response status: ' . $httpStatusLine;
-            }
-            throw ChcException::create(
-                message: $body,
-                code: $httpStatus,
-                query: $query,
-            );
-        }
+        // Не-200 статус либо exception, дописанный в конец тела посреди стриминга
+        // (например, MEMORY_LIMIT_EXCEEDED) — см. ChcErrorDetector.
+        ChcErrorDetector::throwIfError($body, $httpStatus, $http_response_header, $query);
 
-        return (new ChcResponseFactory($request->getReturnFormat()))
+        // X-ClickHouse-Format — эхо реального формата ответа от сервера, надёжнее
+        // getReturnFormat(): FORMAT можно вписать в query вручную, а execute()
+        // не дописывает FORMAT-клаузу. Заголовка нет у DDL/ping — fallback на request.
+        return (new ChcResponseFactory(ChcErrorDetector::responseFormat($http_response_header) ?? $request->getReturnFormat()))
             ->make($body, $httpStatus, $query);
     }
 
