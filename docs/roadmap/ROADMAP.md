@@ -49,17 +49,17 @@
 ## Этап 3. Транспорт и производительность
 
 - [x] Общая сборка HTTP-запроса (аутентификация, TLS, ping, параметры) для обоих
-      транспортов — устранение дублирования между `ChcHttpTransport` и `ChcSymfonyCurlTransport`.
+      транспортов — устранение дублирования между `ChcHttpTransport` и `ChcSymfonyCurlTransport` ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 - [x] Внедрение HTTP-клиента: `setHttpClient(HttpClientInterface $client)` — все запросы
       клиента идут через него с переиспользованием соединений (keep-alive).
-      Без вызова — поведение прежнее.
+      Без вызова — поведение прежнее ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 - [x] Потоковое чтение: `iterate($sql, $params)` — генератор строк поверх `JSONEachRow`,
-      память не зависит от размера результата.
+      память не зависит от размера результата ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 - [x] Потоковая вставка: `insert($table, iterable $rows, $columns)` — `INSERT ... FORMAT JSONEachRow`,
-      тело отправляется потоком.
-- [x] HTTP-сжатие ответов: `setCompression(true)` (`enable_http_compression=1` + gzip).
+      тело отправляется потоком ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
+- [x] HTTP-сжатие ответов: `setCompression(true)` (`enable_http_compression=1` + gzip) ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 - [x] `getJsonPool()`: ограничение параллельности (`setPoolConcurrency()`), заполнение
-      `getLastQueryLatency()`, использование внедрённого HTTP-клиента, удалён закомментированный код.
+      `getLastQueryLatency()`, использование внедрённого HTTP-клиента, удалён закомментированный код ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 
 ## Этап 4. Возможности драйвера
 
