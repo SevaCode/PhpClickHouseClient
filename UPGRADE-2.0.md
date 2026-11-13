@@ -11,7 +11,7 @@
    - string-concatenated values in SQL → query parameters (`fetchAll($sql, ['id' => 5])`);
    - `addSettings(['user' => …, 'password' => …])` → `setCredentials()`;
    - `try { $client->ping() } catch (ChcException)` → `isAlive()`;
-   - `getCode()` as HTTP status → `getHttpStatus()`, as server code → `getServerCode()`.
+   - `getCode()` as HTTP status → `getHttpStatus()`, as ClickHouse error code → `getClickHouseErrorCode()`.
 3. Upgrade to 2.0 and apply the changes below.
 
 ## Breaking changes
