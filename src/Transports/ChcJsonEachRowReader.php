@@ -9,7 +9,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Incremental JSONEachRow parser with detection of errors appended by the server mid-stream:
- * '{"exception": "Code: ..."}' line, plain-text 'Code: ...' or a '__exception__' block (25.x+).
+ * '{"exception": "Code: ..."}' line or a '__exception__' block (25.x+).
  * Rows before the error are yielded, then ChcException is thrown.
  *
  * @internal

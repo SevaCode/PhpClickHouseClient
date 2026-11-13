@@ -48,11 +48,6 @@ class StreamingTest extends TestCase
         $this->assertSame([['x' => 1]], $rows);
         $this->assertSame(395, $e?->getCode());
 
-        // 23.x: plain text
-        [$rows, $e] = $this->iterate(['{"x":1}' . "\n" . 'Code: 241. DB::Exception: mem (MEMORY_LIMIT_EXCEEDED) (version 23.8.16.16 (official build))' . "\n"]);
-        $this->assertSame([['x' => 1]], $rows);
-        $this->assertSame(241, $e?->getCode());
-
         // 25.x+: tagged block
         $msg = 'Code: 395. DB::Exception: boom (FOO) (version 26.10.3.7 (official build))';
         [$rows, $e] = $this->iterate(
