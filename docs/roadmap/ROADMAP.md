@@ -70,7 +70,7 @@
 - [x] Повтор запросов при сетевых ошибках и 502/503/504 — только для read-only запросов:
       `setRetries(int $count, float $delaySeconds)`. По умолчанию выключено ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
 - [x] Исключения: `ChcConnectionException` (нет HTTP-ответа) как наследник `ChcException`;
-      `getServerCode()` и `getHttpStatus()` отдельно от `getCode()` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
+      `getClickHouseErrorCode()` и `getHttpStatus()` отдельно от `getCode()` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
 - [x] `isAlive(): bool` — проверка доступности без исключений (`ping()` не меняется) ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
 - [x] README: документация нового API; нюанс 64-битных целых
       (`output_format_json_quote_64bit_integers`) и режима `wait_end_of_query=1` ([PR #5](https://github.com/sevacode/phpclickhouseclient/pull/5)).
@@ -91,7 +91,7 @@
 - [ ] Отказ от транспорта на `file_get_contents` в пользу единственного на Symfony HttpClient.
 - [ ] `Content-Type: text/plain` вместо `application/x-www-form-urlencoded` для POST.
 - [ ] `ping()` возвращает `false` вместо исключения при недоступном сервере.
-- [ ] Новая иерархия исключений по серверным кодам (не только 159/241), отдельные коды.
+- [ ] Новая иерархия исключений по кодам ошибок ClickHouse (не только 159/241), отдельные коды.
 - [ ] Переименование классов без префикса `Chc`.
 - [ ] Перевод комментариев в коде на английский.
 - [ ] Массовое автоформатирование кода (PHP-CS-Fixer / PER-CS).
