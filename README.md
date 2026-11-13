@@ -52,6 +52,28 @@ PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside 
 Read-only queries are sent with GET by default. `$client->setReadOnlyOverPost(true)` sends them with POST and
 `readonly=2` instead, so long SQL does not hit URL length limits and does not end up in proxy access logs.
 
+## Streaming, inserts, compression, HTTP client
+
+````php
+// Rows one by one (FORMAT JSONEachRow): memory does not depend on result size
+foreach ($client->iterate('SELECT * FROM hits WHERE dt = {dt:Date}', ['dt' => '2024-01-01']) as $row) {
+    // ...
+}
+
+// Streaming insert from an array or a generator; list rows are matched to $columns
+$client->readOnly(false);
+$client->insert('db.events', $rowsGenerator);
+$client->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
+
+$client->setCompression(true);                              // gzip responses and insert bodies
+$client->setHttpClient(Symfony\Component\HttpClient\HttpClient::create()); // keep-alive, proxies, custom TLS
+$client->setPoolConcurrency(8);                             // getJsonPool(): at most 8 requests at once
+````
+
+Errors that ClickHouse sends in the middle of a stream are thrown as `ChcException` after the rows received
+before the error. `insert()` takes the table name as an identifier written into SQL as is — never pass user input.
+`iterate()`, `insert()` and `getJsonPool()` always use Symfony HttpClient; other queries use it only after `setHttpClient()`.
+
 # Install through [Composer](https://getcomposer.org/)
 ````json
 "require": {

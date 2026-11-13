@@ -12,7 +12,6 @@ use SevaCode\ClickHouseClient\Responses\ChcResponseFactory;
 
 class ChcHttpTransport
 {
-    private $method = 'GET';
     /**
      * @var string
      */
@@ -24,6 +23,7 @@ class ChcHttpTransport
     private bool $readOnly = true;
     private bool $readOnlyOverPost = false;
     private ?float $timeout = null;
+    private bool $compression = false;
 
     /**
      * ChcHttpTransport constructor.
@@ -36,74 +36,41 @@ class ChcHttpTransport
 
     public function run(ChcRequest $request)
     {
-        $httpQueryValues = $request->getSettings();
+        $http = ChcHttpRequestBuilder::build($request, $this->readOnly, $this->readOnlyOverPost, $this->compression);
+        $query = (string)$request->getQuery();
 
-        $query = $request->getQuery();
-
-        // пустой запрос (ping) всегда отпрвляем GET'ом
-        $httpMethod = empty($query) ? 'GET' : $this->method;
-
-        // Opt-in: read-only запрос POST'ом с readonly=2 — то же, что сервер выставляет для GET
-        if (!empty($query) && $this->readOnly && $this->readOnlyOverPost) {
-            $httpMethod = 'POST';
-            if (!isset($httpQueryValues['readonly'])) {
-                $httpQueryValues['readonly'] = 2;
-            }
+        $headers = $http->headers;
+        if ($this->compression) {
+            $headers['Accept-Encoding'] = 'gzip';
         }
 
-        $streamOpts = array(
-            'http'=>array(
-                'method' => $httpMethod,
+        $streamOpts = [
+            'http' => [
+                'method' => $http->method,
                 'ignore_errors' => true,
-            ),
-        );
+            ],
+        ];
         if (null !== $this->timeout) {
             $streamOpts['http']['timeout'] = $this->timeout;
         }
-
-        $httpHeader = [];
-
-        // Authentication using the "X-ClickHouse-User" and "X-ClickHouse-Key" headers.
-        // https://clickhouse.com/docs/en/interfaces/http/
-        if (isset($httpQueryValues['user'])) {
-            if (!empty($httpQueryValues['user'])) {
-                $httpHeader[] = 'X-ClickHouse-User: ' . $httpQueryValues['user'];
-            }
-            unset($httpQueryValues['user']);
+        if (null !== $http->body) {
+            $streamOpts['http']['content'] = $http->body;
         }
-        if (isset($httpQueryValues['password'])) {
-            if (!empty($httpQueryValues['password'])) {
-                $httpHeader[] = 'X-ClickHouse-Key: ' . $httpQueryValues['password'];
-            }
-            unset($httpQueryValues['password']);
+        if (!empty($headers)) {
+            $streamOpts['http']['header'] = array_map(
+                static fn(string $name, string $value) => "$name: $value",
+                array_keys($headers),
+                $headers,
+            );
         }
-
-        if (isset($httpQueryValues['ssl_cafile'])) {
-            if (!empty($httpQueryValues['ssl_cafile'])) {
-                $streamOpts['ssl'] = [
-                    'cafile' => $httpQueryValues['ssl_cafile'],
-                    'verify_peer' => true,
-                ];
-            }
-            unset($httpQueryValues['ssl_cafile']);
+        if (null !== $http->cafile) {
+            $streamOpts['ssl'] = [
+                'cafile' => $http->cafile,
+                'verify_peer' => true,
+            ];
         }
-
-        if (empty($query)) {
-            $httpPath = 'ping';
-            $httpQueryValues = [];
-        } else {
-            $httpPath = '';
-            if ('POST' === $httpMethod) {
-                $httpHeader[] = "Content-type: application/x-www-form-urlencoded";
-                $streamOpts['http']['content'] = $query;
-            } else {
-                $httpQueryValues['query'] = $query;
-            }
-        }
-
-        if (!empty($httpHeader)) {
-            $streamOpts['http']['header'] = $httpHeader;
-        }
+        $httpPath = $http->path;
+        $httpQueryValues = $http->query;
 
         $context = stream_context_create($streamOpts);
         $url = $this->url . '/' . $httpPath . (empty($httpQueryValues) ? '' : ('?' . http_build_query($httpQueryValues)));
@@ -135,6 +102,17 @@ class ChcHttpTransport
 
         $httpStatus = (int)$match[1];
 
+        foreach ($http_response_header as $line) {
+            if (preg_match('{^Content-Encoding:\s*gzip}i', $line)) {
+                $decoded = @gzdecode($body);
+                if (false === $decoded) {
+                    throw ChcException::create(message: 'Failed to decode gzip response', code: $httpStatus, query: $query);
+                }
+                $body = $decoded;
+                break;
+            }
+        }
+
         // Не-200 статус либо exception, дописанный в конец тела посреди стриминга
         // (например, MEMORY_LIMIT_EXCEEDED) — см. ChcErrorDetector.
         ChcErrorDetector::throwIfError($body, $httpStatus, $http_response_header, $query);
@@ -149,7 +127,15 @@ class ChcHttpTransport
     public function setReadOnly(bool $isReadOnly): ChcHttpTransport
     {
         $this->readOnly = $isReadOnly;
-        $this->method = $isReadOnly ? 'GET' : 'POST';
+        return $this;
+    }
+
+    /**
+     * Response compression: enable_http_compression=1 + Accept-Encoding: gzip.
+     */
+    public function setCompression(bool $compression): static
+    {
+        $this->compression = $compression;
         return $this;
     }
 

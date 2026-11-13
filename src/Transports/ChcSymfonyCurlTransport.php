@@ -16,11 +16,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 class ChcSymfonyCurlTransport
 {
-    private string $method = 'GET';
     private HttpClientInterface $client;
     private bool $readOnly = true;
     private bool $readOnlyOverPost = false;
     private ?float $timeout = null;
+    private bool $compression = false;
+    /** @var array<string, mixed> */
+    private array $options = [];
 
     public function __construct(HttpClientInterface $client)
     {
@@ -29,73 +31,84 @@ class ChcSymfonyCurlTransport
 
     public function request(ChcRequest $request): ExtendedSymfonyHttpResponse
     {
-        $httpQueryValues = $request->getSettings();
+        $http = ChcHttpRequestBuilder::build($request, $this->readOnly, $this->readOnlyOverPost, $this->compression);
 
-        $query = $request->getQuery();
-
-        // пустой запрос (ping) всегда отпрвляем GET'ом
-        $httpMethod = empty($query) ? 'GET' : $this->method;
-
-        // Opt-in: read-only запрос POST'ом с readonly=2 — то же, что сервер выставляет для GET
-        if (!empty($query) && $this->readOnly && $this->readOnlyOverPost) {
-            $httpMethod = 'POST';
-            if (!isset($httpQueryValues['readonly'])) {
-                $httpQueryValues['readonly'] = 2;
-            }
+        // gzip-ответ (enable_http_compression=1) Symfony HttpClient распаковывает сам
+        $options = $this->options;
+        if (!empty($http->query)) {
+            $options['query'] = $http->query;
         }
-
-        $streamOpts = [];
+        if (null !== $http->body) {
+            $options['body'] = $http->body;
+        }
+        if (!empty($http->headers)) {
+            $options['headers'] = $http->headers;
+        }
+        if (null !== $http->cafile) {
+            $options['cafile'] = $http->cafile;
+            $options['verify_peer'] = true;
+        }
         if (null !== $this->timeout) {
-            $streamOpts['timeout'] = $this->timeout;
-        }
-
-        $httpHeader = [];
-
-        // Authentication using the "X-ClickHouse-User" and "X-ClickHouse-Key" headers.
-        // https://clickhouse.com/docs/en/interfaces/http/
-        if (isset($httpQueryValues['user'])) {
-            if (!empty($httpQueryValues['user'])) {
-                $httpHeader['X-ClickHouse-User'] = $httpQueryValues['user'];
-            }
-            unset($httpQueryValues['user']);
-        }
-        if (isset($httpQueryValues['password'])) {
-            if (!empty($httpQueryValues['password'])) {
-                $httpHeader['X-ClickHouse-Key'] = $httpQueryValues['password'];
-            }
-            unset($httpQueryValues['password']);
-        }
-
-        if (isset($httpQueryValues['ssl_cafile'])) {
-            if (!empty($httpQueryValues['ssl_cafile'])) {
-                $streamOpts['cafile'] = $httpQueryValues['ssl_cafile'];
-                $streamOpts['verify_peer'] = true;
-            }
-            unset($httpQueryValues['ssl_cafile']);
-        }
-
-        if (empty($query)) {
-            $url = '/ping';
-        } else {
-            $url = '';
-            $streamOpts['query'] = $httpQueryValues;
-            if ('POST' === $httpMethod) {
-                $httpHeader['Content-type'] = 'application/x-www-form-urlencoded';
-                $streamOpts['body'] = $query;
-            } else {
-                $streamOpts['query']['query'] = $query;
-            }
-        }
-
-        if (!empty($httpHeader)) {
-            $streamOpts['headers'] = $httpHeader;
+            $options['timeout'] = $this->timeout;
         }
 
         return new ExtendedSymfonyHttpResponse(
-            decoratedResponse: $this->client->request($httpMethod, $url, $streamOpts),
+            decoratedResponse: $this->client->request($http->method, '' === $http->path ? '' : '/' . $http->path, $options),
+            request: $request,
+            query: (string)$request->getQuery(),
+        );
+    }
+
+    /**
+     * POST with SQL in the URL and $body (chunks of data) streamed as the request body.
+     *
+     * @param iterable<string> $body
+     */
+    public function insert(ChcRequest $request, iterable $body, bool $gzip = false): ExtendedSymfonyHttpResponse
+    {
+        $http = ChcHttpRequestBuilder::build($request, false);
+        $query = (string)$request->getQuery();
+
+        $headers = $http->headers;
+        unset($headers['Content-type']);
+        if ($gzip) {
+            $headers['Content-Encoding'] = 'gzip';
+        }
+
+        $options = $this->options;
+        $options['query'] = $http->query + ['query' => $query];
+        $options['body'] = $body instanceof \Generator ? $body : (static fn() => yield from $body)();
+        if (!empty($headers)) {
+            $options['headers'] = $headers;
+        }
+        if (null !== $http->cafile) {
+            $options['cafile'] = $http->cafile;
+            $options['verify_peer'] = true;
+        }
+        if (null !== $this->timeout) {
+            $options['timeout'] = $this->timeout;
+        }
+
+        return new ExtendedSymfonyHttpResponse(
+            decoratedResponse: $this->client->request('POST', '', $options),
             request: $request,
             query: $query,
         );
+    }
+
+    /**
+     * Body chunks as they arrive.
+     *
+     * @return \Generator<int, string>
+     */
+    public function stream(ExtendedSymfonyHttpResponse $response): \Generator
+    {
+        foreach ($this->client->stream($response->getDecoratedResponse()) as $chunk) {
+            $content = $chunk->getContent(); // throws on timeout / network error
+            if ('' !== $content) {
+                yield $content;
+            }
+        }
     }
 
     public function response(ExtendedSymfonyHttpResponse $response): ChcResponse
@@ -121,7 +134,26 @@ class ChcSymfonyCurlTransport
     public function setReadOnly(bool $isReadOnly): static
     {
         $this->readOnly = $isReadOnly;
-        $this->method = $isReadOnly ? 'GET' : 'POST';
+        return $this;
+    }
+
+    /**
+     * Response compression: enable_http_compression=1, decoding is done by the HTTP client.
+     */
+    public function setCompression(bool $compression): static
+    {
+        $this->compression = $compression;
+        return $this;
+    }
+
+    /**
+     * Extra Symfony HttpClient options for every request (e.g. base_uri).
+     *
+     * @param array<string, mixed> $options
+     */
+    public function setOptions(array $options): static
+    {
+        $this->options = $options;
         return $this;
     }
 

@@ -48,17 +48,17 @@
 
 ## Этап 3. Транспорт и производительность
 
-- [ ] Общая сборка HTTP-запроса (аутентификация, TLS, ping, параметры) для обоих
+- [x] Общая сборка HTTP-запроса (аутентификация, TLS, ping, параметры) для обоих
       транспортов — устранение дублирования между `ChcHttpTransport` и `ChcSymfonyCurlTransport`.
-- [ ] Внедрение HTTP-клиента: `setHttpClient(HttpClientInterface $client)` — все запросы
+- [x] Внедрение HTTP-клиента: `setHttpClient(HttpClientInterface $client)` — все запросы
       клиента идут через него с переиспользованием соединений (keep-alive).
       Без вызова — поведение прежнее.
-- [ ] Потоковое чтение: `iterate($sql, $params)` — генератор строк поверх `JSONEachRow`,
+- [x] Потоковое чтение: `iterate($sql, $params)` — генератор строк поверх `JSONEachRow`,
       память не зависит от размера результата.
-- [ ] Потоковая вставка: `insert($table, iterable $rows, $columns)` — `INSERT ... FORMAT JSONEachRow`,
+- [x] Потоковая вставка: `insert($table, iterable $rows, $columns)` — `INSERT ... FORMAT JSONEachRow`,
       тело отправляется потоком.
-- [ ] HTTP-сжатие ответов: `setCompression(true)` (`enable_http_compression=1` + gzip).
-- [ ] `getJsonPool()`: ограничение параллельности (`setPoolConcurrency()`), заполнение
+- [x] HTTP-сжатие ответов: `setCompression(true)` (`enable_http_compression=1` + gzip).
+- [x] `getJsonPool()`: ограничение параллельности (`setPoolConcurrency()`), заполнение
       `getLastQueryLatency()`, использование внедрённого HTTP-клиента, удалён закомментированный код.
 
 ## Этап 4. Возможности драйвера

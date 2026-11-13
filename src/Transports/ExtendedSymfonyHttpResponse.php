@@ -45,6 +45,11 @@ class ExtendedSymfonyHttpResponse implements ResponseInterface
         return $this->decoratedResponse->getInfo($type);
     }
 
+    public function getDecoratedResponse(): ResponseInterface
+    {
+        return $this->decoratedResponse;
+    }
+
     public function getRequest(): ChcRequest
     {
         return $this->request;
