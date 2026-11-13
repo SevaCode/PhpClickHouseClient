@@ -10,24 +10,24 @@
 
 ## Этап 0. Документация и процесс
 
-- [x] Структура `docs/` (`roadmap/`, `adr/`), шаблон ADR.
-- [x] ADR-0001: политика обратной совместимости.
-- [x] Этот документ.
+- [x] Структура `docs/` (`roadmap/`, `adr/`), шаблон ADR ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
+- [x] ADR-0001: политика обратной совместимости ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
+- [x] Этот документ ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
 
 ## Этап 1. Инфраструктура и качество
 
 Цель: любое изменение проверяется автоматически, в т.ч. против настоящего ClickHouse.
 
-- [x] `composer.json`: явная зависимость `psr/log`; `symfony/http-client: ^6.2 || ^7.0`.
-- [x] Совместимость с PHP 8.4: явный nullable в `ExtendedSymfonyHttpResponse::getInfo()`.
-- [x] PHPUnit в `require-dev`; регрессионные тесты из `tests/run.php` перенесены в PHPUnit.
+- [x] `composer.json`: явная зависимость `psr/log`; `symfony/http-client: ^6.2 || ^7.0` ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] Совместимость с PHP 8.4: явный nullable в `ExtendedSymfonyHttpResponse::getInfo()` ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] PHPUnit в `require-dev`; регрессионные тесты из `tests/run.php` перенесены в PHPUnit ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
 - [x] Интеграционные тесты против реального ClickHouse (группа `integration`,
-      включаются переменной окружения `CLICKHOUSE_URL`).
-- [x] PHPStan в `require-dev` + `phpstan.neon.dist`, уровень 5 без ошибок (повышать постепенно).
+      включаются переменной окружения `CLICKHOUSE_URL`) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] PHPStan в `require-dev` + `phpstan.neon.dist`, уровень 5 без ошибок (повышать постепенно) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
 - [x] GitHub Actions: матрица PHP 8.1–8.4, юнит-тесты, PHPStan, интеграционные тесты
-      с ClickHouse в service-контейнере.
-- [x] README: разделы «Разработка» и «Тесты» обновлены.
-- [x] Детекция ошибок посреди стриминга исправлена по итогам интеграционных тестов: plain-text
+      с ClickHouse в service-контейнере ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] README: разделы «Разработка» и «Тесты» обновлены ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] Детекция ошибок посреди стриминга исправлена по итогам интеграционных тестов: plain-text ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2))
   сразу после JSON-данных (ClickHouse 23.x) и блок `__exception__` с `X-ClickHouse-Exception-Tag` (25.x+).
 
 ## Этап 2. Безопасность и корректность
@@ -36,30 +36,30 @@
 
 - [x] Серверные параметризованные запросы: `{name:Type}` в SQL + значения отдельно
       (`param_name=...`). Кодирование значений (`ChcParamEncoder`): string, int, float, bool,
-      null, `DateTimeInterface`, массивы (в т.ч. вложенные).
+      null, `DateTimeInterface`, массивы (в т.ч. вложенные) ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
 - [x] Новый высокоуровневый API с параметрами (новые методы, старые не меняются):
-      `fetchAll()`, `fetchRow()`, `fetchOne()`, `fetchColumn()`, `write()`.
+      `fetchAll()`, `fetchRow()`, `fetchOne()`, `fetchColumn()`, `write()` ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
 - [x] Учётные данные отдельно от настроек ClickHouse: `setCredentials($user, $password)`
-      (старый способ через `addSettings(['user' => ..., 'password' => ...])` продолжает работать).
-- [x] Таймаут HTTP-запроса: `setTimeout(?float $seconds)` для обоих транспортов.
+      (старый способ через `addSettings(['user' => ..., 'password' => ...])` продолжает работать) ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
+- [x] Таймаут HTTP-запроса: `setTimeout(?float $seconds)` для обоих транспортов ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
 - [x] Opt-in чтение через POST: `setReadOnlyOverPost(true)` — read-only запросы уходят POST
       с `readonly=2` (то же, что сервер выставляет для GET), SQL не попадает в URL
-      и не упирается в лимит длины URL. По умолчанию — как раньше, GET.
+      и не упирается в лимит длины URL. По умолчанию — как раньше, GET ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
 
 ## Этап 3. Транспорт и производительность
 
 - [x] Общая сборка HTTP-запроса (аутентификация, TLS, ping, параметры) для обоих
-      транспортов — устранение дублирования между `ChcHttpTransport` и `ChcSymfonyCurlTransport`.
+      транспортов — устранение дублирования между `ChcHttpTransport` и `ChcSymfonyCurlTransport` ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 - [x] Внедрение HTTP-клиента: `setHttpClient(HttpClientInterface $client)` — все запросы
       клиента идут через него с переиспользованием соединений (keep-alive).
-      Без вызова — поведение прежнее.
+      Без вызова — поведение прежнее ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 - [x] Потоковое чтение: `iterate($sql, $params)` — генератор строк поверх `JSONEachRow`,
-      память не зависит от размера результата.
+      память не зависит от размера результата ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 - [x] Потоковая вставка: `insert($table, iterable $rows, $columns)` — `INSERT ... FORMAT JSONEachRow`,
-      тело отправляется потоком.
-- [x] HTTP-сжатие ответов: `setCompression(true)` (`enable_http_compression=1` + gzip).
+      тело отправляется потоком ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
+- [x] HTTP-сжатие ответов: `setCompression(true)` (`enable_http_compression=1` + gzip) ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 - [x] `getJsonPool()`: ограничение параллельности (`setPoolConcurrency()`), заполнение
-      `getLastQueryLatency()`, использование внедрённого HTTP-клиента, удалён закомментированный код.
+      `getLastQueryLatency()`, использование внедрённого HTTP-клиента, удалён закомментированный код ([PR #4](https://github.com/sevacode/phpclickhouseclient/pull/4)).
 
 ## Этап 4. Возможности драйвера
 
