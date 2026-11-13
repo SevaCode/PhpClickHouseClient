@@ -15,7 +15,7 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 - `getLastQueryId()`, `getLastQuerySummary()`, `ChcResponse::getQueryId()/getSummary()/getHeaderLines()`.
 - `setSessionId()`, opt-in `setRetries()` for read-only queries, `isAlive()`.
 - `ChcConnectionException` (extends `ChcException`), `ChcException::getServerCode()/getHttpStatus()`.
-- PHPUnit, PHPStan, integration tests against ClickHouse 23.8 / 24.8 / latest, GitHub Actions CI.
+- PHPUnit, PHPStan, integration tests against ClickHouse 24.8 / latest, GitHub Actions CI.
 - `docs/`: roadmap and ADRs.
 
 ### Changed
@@ -24,6 +24,5 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 - `getJsonPool()` fills `getLastQueryLatency()` and cancels pending requests on error.
 
 ### Fixed
-- Mid-stream errors of ClickHouse 23.x (plain text right after JSON) and 25.x+
-  (`__exception__` block with `X-ClickHouse-Exception-Tag`) are detected.
+- Mid-stream errors of ClickHouse 25.x+ (`__exception__` block with `X-ClickHouse-Exception-Tag`) are detected.
 - `ExtendedSymfonyHttpResponse::getInfo()` implicit nullable parameter (PHP 8.4 deprecation).
