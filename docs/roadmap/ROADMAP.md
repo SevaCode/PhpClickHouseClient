@@ -10,24 +10,24 @@
 
 ## Этап 0. Документация и процесс
 
-- [x] Структура `docs/` (`roadmap/`, `adr/`), шаблон ADR.
-- [x] ADR-0001: политика обратной совместимости.
-- [x] Этот документ.
+- [x] Структура `docs/` (`roadmap/`, `adr/`), шаблон ADR ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
+- [x] ADR-0001: политика обратной совместимости ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
+- [x] Этот документ ([PR #1](https://github.com/sevacode/phpclickhouseclient/pull/1)).
 
 ## Этап 1. Инфраструктура и качество
 
 Цель: любое изменение проверяется автоматически, в т.ч. против настоящего ClickHouse.
 
-- [x] `composer.json`: явная зависимость `psr/log`; `symfony/http-client: ^6.2 || ^7.0`.
-- [x] Совместимость с PHP 8.4: явный nullable в `ExtendedSymfonyHttpResponse::getInfo()`.
-- [x] PHPUnit в `require-dev`; регрессионные тесты из `tests/run.php` перенесены в PHPUnit.
+- [x] `composer.json`: явная зависимость `psr/log`; `symfony/http-client: ^6.2 || ^7.0` ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] Совместимость с PHP 8.4: явный nullable в `ExtendedSymfonyHttpResponse::getInfo()` ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] PHPUnit в `require-dev`; регрессионные тесты из `tests/run.php` перенесены в PHPUnit ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
 - [x] Интеграционные тесты против реального ClickHouse (группа `integration`,
-      включаются переменной окружения `CLICKHOUSE_URL`).
-- [x] PHPStan в `require-dev` + `phpstan.neon.dist`, уровень 5 без ошибок (повышать постепенно).
+      включаются переменной окружения `CLICKHOUSE_URL`) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] PHPStan в `require-dev` + `phpstan.neon.dist`, уровень 5 без ошибок (повышать постепенно) ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
 - [x] GitHub Actions: матрица PHP 8.1–8.4, юнит-тесты, PHPStan, интеграционные тесты
-      с ClickHouse в service-контейнере.
-- [x] README: разделы «Разработка» и «Тесты» обновлены.
-- [x] Детекция ошибок посреди стриминга исправлена по итогам интеграционных тестов: plain-text
+      с ClickHouse в service-контейнере ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] README: разделы «Разработка» и «Тесты» обновлены ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2)).
+- [x] Детекция ошибок посреди стриминга исправлена по итогам интеграционных тестов: plain-text ([PR #2](https://github.com/sevacode/phpclickhouseclient/pull/2))
   сразу после JSON-данных (ClickHouse 23.x) и блок `__exception__` с `X-ClickHouse-Exception-Tag` (25.x+).
 
 ## Этап 2. Безопасность и корректность
