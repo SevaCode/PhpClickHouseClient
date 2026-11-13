@@ -98,6 +98,34 @@ class ChcErrorDetectorTest extends TestCase
         $this->caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, ['Content-Type: text/plain'], 'q'), ChcException::class);
     }
 
+    public function testDetectsTaggedExceptionBlock(): void
+    {
+        // ClickHouse 25.x+: X-ClickHouse-Exception-Tag + блок __exception__ в любом формате
+        $message = 'Code: 395. DB::Exception: boom (FUNCTION_THROW_IF_VALUE_IS_NON_ZERO) (version 26.10.3.7 (official build))';
+        $block = "\r\n__exception__\r\nabcd\r\n$message\n" . strlen($message) . " abcd\r\n__exception__\r\n";
+        foreach (['JSON', 'TabSeparated', 'JSONCompactEachRow'] as $format) {
+            $headers = ['HTTP/1.1 200 OK', "X-ClickHouse-Format: $format", 'X-ClickHouse-Exception-Tag: abcd'];
+            $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError("1\t2\n" . $block, 200, $headers, 'q'), ChcException::class);
+            $this->assertSame(395, $e->getCode());
+            $this->assertSame($message, $e->getMessage());
+            $this->assertSame('q', $e->getQuery());
+        }
+
+        // Блок с чужим тегом (пользовательские данные) не считается ошибкой
+        $this->assertNull(ChcErrorDetector::detectTagged("x\r\n__exception__\r\nzzzz\r\nCode: 1. fake\r\n12 zzzz\r\n__exception__\r\n", 'abcd', 200, 'q'));
+        // Тег есть, ошибки нет
+        ChcErrorDetector::throwIfError("1\t2\n", 200, ['HTTP/1.1 200 OK', 'X-ClickHouse-Exception-Tag: abcd'], 'q');
+        $this->addToAssertionCount(1);
+    }
+
+    public function testJsonFormatAlsoDetectsPlainTrailer(): void
+    {
+        // ClickHouse 23.x дописывает plain-text ошибку сразу после JSON-данных
+        $body = "{\n\t\"data\":\n\t[\n\t\t{\"n\": 1}Code: 395. DB::Exception: boom (FOO) (version 23.8.16.16 (official build))\n";
+        $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError($body, 200, ['HTTP/1.1 200 OK', 'X-ClickHouse-Format: JSON'], 'q'), ChcException::class);
+        $this->assertSame(395, $e->getCode());
+    }
+
     public function testUnifiesStatusAndTailErrors(): void
     {
         // не-200 + пустое тело: статус-строка сохраняется в сообщении

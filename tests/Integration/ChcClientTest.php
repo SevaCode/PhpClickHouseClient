@@ -42,7 +42,7 @@ class ChcClientTest extends IntegrationTestCase
             $client->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory");
             $client->execute("INSERT INTO $table VALUES (1), (2)");
             $client->readOnly(true);
-            $this->assertSame([['c' => '2']], $client->getJsonData("SELECT count() AS c FROM $table"));
+            $this->assertSame([['c' => 2]], $client->getJsonData("SELECT toUInt8(count()) AS c FROM $table"));
         } finally {
             $client->readOnly(false);
             $client->execute("DROP TABLE IF EXISTS $table");

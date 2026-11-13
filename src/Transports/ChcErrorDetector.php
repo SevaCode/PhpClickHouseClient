@@ -18,6 +18,9 @@ use SevaCode\ClickHouseClient\ChcException;
  *    выходного формата: поле "exception" в JSON-семействе, <exception> в XML,
  *    plain-text 'Code: N. DB::Exception: ...' в текстовых форматах.
  * Чтобы не сканировать многомегабайтные ответы, проверяем только последние 4 КБ.
+ * ClickHouse 25.x+ при этом выставляет заголовок X-ClickHouse-Exception-Tag
+ * и оборачивает ошибку в блок '__exception__\r\n<tag>\r\n<message>\r\n<len> <tag>\r\n__exception__'
+ * независимо от формата — такой блок ищем в первую очередь.
  * Текст самой ошибки по HTTP доступен только в теле: X-ClickHouse-Exception-Code
  * несёт лишь числовой код, а при wait_end_of_query=1 тело и вовсе пустое.
  */
@@ -48,6 +51,11 @@ class ChcErrorDetector
             );
         }
 
+        $tag = self::exceptionTag($headerLines);
+        if (null !== $tag && ($exception = self::detectTagged($body, $tag, $httpStatus, $query))) {
+            throw $exception;
+        }
+
         if ($exception = self::detect($body, $httpStatus, self::checksFor($headerLines), $query)) {
             throw $exception;
         }
@@ -67,6 +75,38 @@ class ChcErrorDetector
             if (preg_match('{^X-ClickHouse-Format:\s*(\S+)}i', $line, $m)) {
                 return $m[1];
             }
+        }
+        return null;
+    }
+
+    /**
+     * Значение X-ClickHouse-Exception-Tag (ClickHouse 25.x+), null — заголовка нет.
+     *
+     * @param string[] $headerLines
+     */
+    private static function exceptionTag(array $headerLines): ?string
+    {
+        foreach ($headerLines as $line) {
+            if (preg_match('{^X-ClickHouse-Exception-Tag:\s*(\S+)}i', $line, $m)) {
+                return $m[1];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Блок '__exception__\r\n<tag>\r\n<message>\r\n<len> <tag>\r\n__exception__' в конце тела.
+     */
+    public static function detectTagged(string $body, string $tag, int $httpStatus, ?string $query): ?ChcException
+    {
+        $tail = strlen($body) > self::TAIL_SIZE ? substr($body, -self::TAIL_SIZE) : $body;
+        $quotedTag = preg_quote($tag, '/');
+        if (preg_match('/__exception__\r?\n' . $quotedTag . '\r?\n([\s\S]*?)\r?\n\d+ ' . $quotedTag . '\r?\n__exception__\s*$/', $tail, $m)) {
+            return ChcException::create(
+                message: rtrim($m[1]),
+                code: $httpStatus,
+                query: $query,
+            );
         }
         return null;
     }
@@ -115,8 +155,9 @@ class ChcErrorDetector
         $format = self::responseFormat($headerLines);
         if (null !== $format) {
             return match ($format) {
-                // Эти форматы встраивают exception как поле/строку "exception"
-                'JSON', 'JSONCompact', 'JSONStrings', 'JSONEachRow' => ['json'],
+                // Эти форматы встраивают exception как поле/строку "exception";
+                // старые серверы (23.x) дописывают plain-text сразу после данных
+                'JSON', 'JSONCompact', 'JSONStrings', 'JSONEachRow' => ['json', 'plain'],
                 'XML' => ['xml'],
                 // JSONCompactEachRow и будущие JSON*-форматы — все сигнатуры,
                 // способ встраивания для них не проверен
@@ -131,7 +172,7 @@ class ChcErrorDetector
         }
         // application/json, application/x-ndjson и прочие *json*
         if (str_contains($contentType, 'json')) {
-            return ['json'];
+            return ['json', 'plain'];
         }
         if (str_contains($contentType, 'xml')) {
             return ['xml'];
