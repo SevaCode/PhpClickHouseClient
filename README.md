@@ -89,8 +89,8 @@ try {
 } catch (ChcConnectionException $e) {   // no HTTP response (extends ChcException)
 } catch (ChcException $e) {
     $e->getClickHouseErrorCode();  // 60 — ClickHouse error code, null if not a ClickHouse error
-    $e->getHttpStatus();  // 404 — HTTP status, null if there was no response
-    $e->getCode();        // as before: ClickHouse error code if known, otherwise HTTP status
+    $e->getHttpStatus();          // 404 — HTTP status, null if there was no response
+    $e->getCode();                // as before: ClickHouse error code if known, otherwise HTTP status
 }
 ````
 
