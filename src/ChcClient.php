@@ -33,6 +33,8 @@ class ChcClient
     protected $last_query_latency;
 
     private ?LoggerInterface $sqlLogger = null;
+    private ?float $timeout = null;
+    private bool $readOnlyOverPost = false;
 
     /**
      * @param boolean|null $isReadOnly
@@ -60,6 +62,35 @@ class ChcClient
     public function addSettings($settings)
     {
         $this->settings = array_merge($this->settings, $settings);
+    }
+
+    /**
+     * Credentials are sent in X-ClickHouse-User / X-ClickHouse-Key headers,
+     * never in the URL. Same as addSettings(['user' => ..., 'password' => ...]).
+     */
+    public function setCredentials(?string $user, ?string $password = null): void
+    {
+        $this->settings['user'] = $user;
+        $this->settings['password'] = $password;
+    }
+
+    /**
+     * HTTP read/idle timeout in seconds; null — transport default.
+     * Server-side limit is a separate setting: addSettings(['max_execution_time' => N]).
+     */
+    public function setTimeout(?float $seconds): void
+    {
+        $this->timeout = $seconds;
+    }
+
+    /**
+     * Opt-in: send read-only queries by POST with readonly=2 instead of GET.
+     * The server applies readonly=2 to GET requests itself, so the guarantees are the same,
+     * but SQL is not put into the URL (no URL length limit, no SQL in proxy access logs).
+     */
+    public function setReadOnlyOverPost(bool $enabled): void
+    {
+        $this->readOnlyOverPost = $enabled;
     }
 
     /**
@@ -102,7 +133,9 @@ class ChcClient
     protected function runRequest(ChcRequest $request): ChcResponse
     {
         $transport = (new ChcHttpTransport($this->url))
-            ->setReadOnly($this->isReadOnly);
+            ->setReadOnly($this->isReadOnly)
+            ->setReadOnlyOverPost($this->readOnlyOverPost)
+            ->setTimeout($this->timeout);
 
         try {
             return $transport->run($request);
@@ -174,6 +207,102 @@ class ChcClient
     }
 
     /**
+     * All rows of a SELECT. Values are passed as server-side query parameters:
+     *
+     *     $client->fetchAll('SELECT * FROM t WHERE id = {id:UInt64} AND tag IN {tags:Array(String)}',
+     *         ['id' => 5, 'tags' => ['a', 'b']]);
+     *
+     * @param array<string, mixed> $params values for {name:Type} placeholders
+     * @param array<string, mixed> $settings ClickHouse settings for this query only
+     * @return array<int, array<string, mixed>>
+     * @throws ChcException
+     */
+    public function fetchAll(string $sql, array $params = [], array $settings = []): array
+    {
+        return $this->fetchJson($sql, $params, $settings)['data'];
+    }
+
+    /**
+     * First row or null.
+     *
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>|null
+     * @throws ChcException
+     */
+    public function fetchRow(string $sql, array $params = [], array $settings = []): ?array
+    {
+        return $this->fetchAll($sql, $params, $settings)[0] ?? null;
+    }
+
+    /**
+     * First column of the first row or null.
+     *
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $settings
+     * @throws ChcException
+     */
+    public function fetchOne(string $sql, array $params = [], array $settings = []): mixed
+    {
+        $row = $this->fetchRow($sql, $params, $settings);
+        return null === $row ? null : (array_values($row)[0] ?? null);
+    }
+
+    /**
+     * First column of every row.
+     *
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $settings
+     * @return array<int, mixed>
+     * @throws ChcException
+     */
+    public function fetchColumn(string $sql, array $params = [], array $settings = []): array
+    {
+        return array_map(
+            static fn(array $row) => array_values($row)[0] ?? null,
+            $this->fetchAll($sql, $params, $settings),
+        );
+    }
+
+    /**
+     * DDL/DML (CREATE, INSERT ... VALUES, ALTER ...) with query parameters.
+     * Honours readOnly(): call readOnly(false) first, as for execute().
+     *
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $settings
+     * @throws ChcException
+     */
+    public function write(string $sql, array $params = [], array $settings = []): ChcResponse
+    {
+        return $this->runRequest($this->makeParamRequest($sql, $params, $settings, ''));
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>
+     */
+    private function fetchJson(string $sql, array $params, array $settings): array
+    {
+        $sql .= $this->getQueryFormatPostfix(ChcFormat::JSON);
+        return $this->runRequest($this->makeParamRequest($sql, $params, $settings, ChcFormat::JSON))->getResponse();
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @param array<string, mixed> $settings
+     */
+    private function makeParamRequest(string $sql, array $params, array $settings, string $format): ChcRequest
+    {
+        $this->logSql($sql);
+
+        return (new ChcRequest)
+            ->setSettings(array_merge($this->settings, $settings, ChcParamEncoder::toHttpParams($params)))
+            ->setQuery($sql)
+            ->setReturnFormat($format);
+    }
+
+    /**
      * Sends all queries to ClickHouse in parallel and passes each JSON response
      * through $callback. The returned array is keyed by the original $queries keys.
      *
@@ -188,7 +317,9 @@ class ChcClient
         $client = $this->createHttpClient();
 
         $transport = (new ChcSymfonyCurlTransport($client))
-            ->setReadOnly($this->isReadOnly);
+            ->setReadOnly($this->isReadOnly)
+            ->setReadOnlyOverPost($this->readOnlyOverPost)
+            ->setTimeout($this->timeout);
 
         $responses = [];
         foreach ($queries as $key => $query) {

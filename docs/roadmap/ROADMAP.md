@@ -34,17 +34,17 @@
 
 Цель: безопасная передача пользовательских значений и явная конфигурация подключения.
 
-- [ ] Серверные параметризованные запросы: `{name:Type}` в SQL + значения отдельно
+- [x] Серверные параметризованные запросы: `{name:Type}` в SQL + значения отдельно
       (`param_name=...`). Кодирование значений (`ChcParamEncoder`): string, int, float, bool,
-      null, `DateTimeInterface`, массивы (в т.ч. вложенные).
-- [ ] Новый высокоуровневый API с параметрами (новые методы, старые не меняются):
-      `fetchAll()`, `fetchRow()`, `fetchOne()`, `fetchColumn()`, `write()`.
-- [ ] Учётные данные отдельно от настроек ClickHouse: `setCredentials($user, $password)`
-      (старый способ через `addSettings(['user' => ..., 'password' => ...])` продолжает работать).
-- [ ] Таймаут HTTP-запроса: `setTimeout(?float $seconds)` для обоих транспортов.
-- [ ] Opt-in чтение через POST: `setReadOnlyOverPost(true)` — read-only запросы уходят POST
+      null, `DateTimeInterface`, массивы (в т.ч. вложенные) ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
+- [x] Новый высокоуровневый API с параметрами (новые методы, старые не меняются):
+      `fetchAll()`, `fetchRow()`, `fetchOne()`, `fetchColumn()`, `write()` ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
+- [x] Учётные данные отдельно от настроек ClickHouse: `setCredentials($user, $password)`
+      (старый способ через `addSettings(['user' => ..., 'password' => ...])` продолжает работать) ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
+- [x] Таймаут HTTP-запроса: `setTimeout(?float $seconds)` для обоих транспортов ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
+- [x] Opt-in чтение через POST: `setReadOnlyOverPost(true)` — read-only запросы уходят POST
       с `readonly=2` (то же, что сервер выставляет для GET), SQL не попадает в URL
-      и не упирается в лимит длины URL. По умолчанию — как раньше, GET.
+      и не упирается в лимит длины URL. По умолчанию — как раньше, GET ([PR #3](https://github.com/sevacode/phpclickhouseclient/pull/3)).
 
 ## Этап 3. Транспорт и производительность
 
