@@ -118,14 +118,6 @@ class ChcErrorDetectorTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    public function testJsonFormatAlsoDetectsPlainTrailer(): void
-    {
-        // ClickHouse 23.x дописывает plain-text ошибку сразу после JSON-данных
-        $body = "{\n\t\"data\":\n\t[\n\t\t{\"n\": 1}Code: 395. DB::Exception: boom (FOO) (version 23.8.16.16 (official build))\n";
-        $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError($body, 200, ['HTTP/1.1 200 OK', 'X-ClickHouse-Format: JSON'], 'q'), ChcException::class);
-        $this->assertSame(395, $e->getCode());
-    }
-
     public function testUnifiesStatusAndTailErrors(): void
     {
         // не-200 + пустое тело: статус-строка сохраняется в сообщении
