@@ -45,7 +45,10 @@ class ChcErrorDetector
         }
 
         if (200 !== $httpStatus) {
-            if ($exception = self::detect($body, $httpStatus, self::CHECKS_ALL, $query)) {
+            // On non-200 ClickHouse writes the error as plain text 'Code: N. DB::Exception: …',
+            // possibly glued to partially written output. X-ClickHouse-Format / Content-Type
+            // still describe the requested format (e.g. JSON), so checksFor() can't be used here.
+            if ($exception = self::detect($body, $httpStatus, ['plain'], $query)) {
                 throw $exception;
             }
 
