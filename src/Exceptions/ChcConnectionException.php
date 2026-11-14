@@ -8,7 +8,7 @@ use SevaCode\ClickHouseClient\ChcException;
 
 /**
  * No HTTP response from ClickHouse: connection refused, DNS, TLS, broken connection.
- * Client-side timeouts are ChcTimeoutExceededException.
+ * Client-side timeouts are ChcClientTimeoutException.
  */
 class ChcConnectionException extends ChcException
 {

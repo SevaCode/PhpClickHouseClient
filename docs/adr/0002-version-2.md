@@ -39,6 +39,11 @@ Composer не обновит пользователей с `^1.x` до 2.0 са�
 (`Cannot modify 'readonly' setting in readonly mode`). Выбран вариант 1: клиент не переопределяет
 явно заданный `readonly`; таким пользователям следует использовать `$c = $c->withReadOnly(1)`.
 
+Клиентский таймаут Symfony — это `ChcClientTimeoutException extends ChcConnectionException`;
+`ChcTimeoutExceededException` означает только серверный таймаут с кодом 159. Для HTTP-ошибок без
+кода ClickHouse добавлен `ChcHttpException`. В 2.0 `isAlive()` — deprecated-синоним `ping()`,
+который будет удалён в 3.0.
+
 Не ломают совместимость, поэтому их можно сделать в любой версии без этого ADR:
 - перевести комментарии на английский;
 - PHP-CS-Fixer / PER-CS;

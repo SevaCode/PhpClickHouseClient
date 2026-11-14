@@ -6,6 +6,7 @@ namespace SevaCode\ClickHouseClient\Tests\Integration;
 
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 
 class ReadOnlyProfileTest extends IntegrationTestCase
 {
@@ -37,7 +38,7 @@ class ReadOnlyProfileTest extends IntegrationTestCase
         $client = $this->client()->withCredentials('chc_ro_user');
         $exception = $this->caughtException(
             fn() => $client->fetchOne('SELECT 1'),
-            ChcException::class,
+            ChcServerException::class,
         );
         $this->assertSame(164, $exception->getClickHouseErrorCode());
 

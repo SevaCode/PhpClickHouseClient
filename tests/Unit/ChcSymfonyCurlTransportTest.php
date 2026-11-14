@@ -7,7 +7,9 @@ namespace SevaCode\ClickHouseClient\Tests\Unit;
 use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcFormat;
 use SevaCode\ClickHouseClient\ChcRequest;
+use SevaCode\ClickHouseClient\Exceptions\ChcHttpException;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use SevaCode\ClickHouseClient\Tests\TestCase;
 use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;
@@ -23,16 +25,16 @@ class ChcSymfonyCurlTransportTest extends TestCase
         $serverErrorMessage = 'Code: 395. DB::Exception: boom (FUNCTION_THROW_IF_VALUE_IS_NON_ZERO) (version 26.10.3.7 (official build))';
         $serverErrorBody = '{"data":[{"x":1}]}' . $serverErrorMessage;
         $cases = [
-            ['partial {', 200, ChcException::class, 'partial {', 200],
-            ['0', 200, ChcException::class, '0', 200],
-            ['', 200, ChcException::class, 'Empty response body', 200],
+            ['partial {', 200, ChcException::class, 'partial {', 0],
+            ['0', 200, ChcException::class, '0', 0],
+            ['', 200, ChcException::class, 'Empty response body', 0],
             [$memoryBody, 200, ChcMemoryLimitExceededException::class, $memoryBody, 241],
             [$timeoutBody, 200, ChcTimeoutExceededException::class, $timeoutBody, 159],
-            [$serverErrorBody, 500, ChcException::class, $serverErrorMessage, 395],
-            ['Code: 60. DB::Exception: Unknown table', 500, ChcException::class, 'Code: 60. DB::Exception: Unknown table', 60],
-            ["1\t2\nCode: 395. DB::Exception: boom (FOO) (version 1.0 (official build))", 200, ChcException::class, 'Code: 395. DB::Exception: boom (FOO) (version 1.0 (official build))', 395],
-            ['Proxy error', 502, ChcException::class, 'Proxy error', 502],
-            ['', 503, ChcException::class, 'Unexpected response status: 503', 503],
+            [$serverErrorBody, 500, ChcServerException::class, $serverErrorMessage, 395],
+            ['Code: 60. DB::Exception: Unknown table', 500, ChcServerException::class, 'Code: 60. DB::Exception: Unknown table', 60],
+            ["1\t2\nCode: 395. DB::Exception: boom (FOO) (version 1.0 (official build))", 200, ChcServerException::class, 'Code: 395. DB::Exception: boom (FOO) (version 1.0 (official build))', 395],
+            ['Proxy error', 502, ChcHttpException::class, 'Proxy error', 0],
+            ['', 503, ChcHttpException::class, 'Unexpected response status: 503', 0],
         ];
         foreach ($cases as [$body, $status, $class, $message, $code]) {
             $e = $this->caughtException(fn() => $this->response($body, $status)->getResponse(), $class);

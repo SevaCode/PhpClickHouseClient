@@ -10,8 +10,8 @@
    - `HttpClient` / `Mode` → `ChcClient`;
    - string-concatenated values in SQL → query parameters (`fetchAll($sql, ['id' => 5])`);
    - `addSettings(['user' => …, 'password' => …])` → `setCredentials()`;
-   - `try { $client->ping() } catch (ChcException)` → `isAlive()`;
-   - `getCode()` as HTTP status → `getHttpStatus()`, as ClickHouse error code → `getClickHouseErrorCode()`.
+   - `ping()` no longer throws in 2.0; `isAlive()` remains as a deprecated alias;
+   - use `getHttpStatus()` for HTTP status; `getCode()` is now the ClickHouse code or `0`.
 3. Upgrade to 2.0 and apply the changes below.
 
 ## Breaking changes
@@ -94,5 +94,28 @@ If your user profile sets `readonly=1`, the default request can fail with Code 1
 `Cannot modify 'readonly' setting in readonly mode`. Use `$client = $client->withReadOnly(1);`.
 An explicit setting passed with `$client = $client->withSettings(['readonly' => 1])` is also preserved.
 See [ClickHouse query permissions](https://clickhouse.com/docs/operations/settings/permissions-for-queries).
+
+### ping() never throws (ADR-0002 #7)
+
+`ping(): bool` returns `false` when the server is unavailable or returns an error, so remove
+`try/catch` around `ping()`. `isAlive()` remains as a deprecated alias for `ping()` and will be
+removed in 3.0.
+
+### Exception hierarchy (ADR-0002 #8)
+
+```text
+ChcException                       getCode() = ClickHouse code or 0; getHttpStatus()
+├── ChcServerException              ClickHouse returned an error code
+│   ├── ChcMemoryLimitExceededException  code 241
+│   └── ChcTimeoutExceededException     server-side timeout, code 159
+├── ChcConnectionException          no HTTP response
+│   └── ChcClientTimeoutException   HTTP client timeout
+└── ChcHttpException                HTTP status >= 300 without a ClickHouse error code
+```
+
+`getCode()` now returns the ClickHouse error code or `0`, never the HTTP status. Use `getHttpStatus()`
+for the response status and `getClickHouseErrorCode()` when you need a nullable ClickHouse error code.
+Client-side timeouts are `ChcClientTimeoutException`, not `ChcTimeoutExceededException`; the latter
+represents server-side error 159. A `catch (ChcException)` still catches every client exception.
 
 _Other accepted ADR-0002 items are added as they are implemented._

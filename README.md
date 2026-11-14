@@ -13,7 +13,7 @@ $data = (new ChcClient())->getJsonData($query);
 ````php
 $client = new ChcClient();
 
-if (!$client->isAlive()) { // ping() throws ChcException when the server is unreachable
+if (!$client->ping()) {
     throw new Exception('ClickHouse is down.');
 }
 
@@ -73,7 +73,7 @@ $writeClient->insert('db.events', $rowsGenerator);
 $writeClient->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
 ````
 
-Errors that ClickHouse sends in the middle of a stream are thrown as `ChcException` after the rows received
+Errors that ClickHouse sends in the middle of a stream are thrown as `ChcServerException` after the rows received
 before the error. `insert()` takes the table name as an identifier written into SQL as is — never pass user input.
 All requests use Symfony HttpClient; inject a configured client with `withHttpClient()` when needed.
 
@@ -89,13 +89,22 @@ $client = $client->withRetries(3, 0.5); // read-only queries only: connection er
 
 try {
     $client->fetchAll('SELECT * FROM missing');
-} catch (ChcConnectionException $e) {   // no HTTP response (extends ChcException)
+} catch (ChcClientTimeoutException $e) { // HTTP client timeout (also a ChcConnectionException)
+} catch (ChcConnectionException $e) {     // no HTTP response
+} catch (ChcServerException $e) {         // ClickHouse error; memory/timeout subclasses included
+    $e->getCode();                        // ClickHouse error code, e.g. 60
+} catch (ChcHttpException $e) {           // HTTP status without a ClickHouse error code
+    $e->getHttpStatus();
 } catch (ChcException $e) {
     $e->getClickHouseErrorCode();  // 60 — ClickHouse error code, null if not a ClickHouse error
     $e->getHttpStatus();           // 404 — HTTP status, null if there was no response
-    $e->getCode();                 // as before: ClickHouse error code if known, otherwise HTTP status
+    $e->getCode();                 // ClickHouse error code or 0, never the HTTP status
 }
 ````
+
+`ChcTimeoutExceededException` is reserved for server-side error 159; HTTP client timeouts use
+`ChcClientTimeoutException`. `catch (ChcException)` still catches all client exceptions.
+`isAlive()` remains as a deprecated alias for the non-throwing `ping()` and will be removed in 3.0.
 
 Notes:
 - With `FORMAT JSON` ClickHouse returns `UInt64`/`Int64` as strings by default

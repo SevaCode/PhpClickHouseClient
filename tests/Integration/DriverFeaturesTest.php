@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
 use SevaCode\ClickHouseClient\ChcClient;
-use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 use Symfony\Component\HttpClient\HttpClient;
 
 class DriverFeaturesTest extends IntegrationTestCase
@@ -48,7 +48,7 @@ class DriverFeaturesTest extends IntegrationTestCase
         $this->assertNotNull($client->getLastQueryId());
 
         $client = $client->withSession(null);
-        $e = $this->caughtException(fn() => $client->fetchOne('SELECT x FROM tmp'), ChcException::class);
+        $e = $this->caughtException(fn() => $client->fetchOne('SELECT x FROM tmp'), ChcServerException::class);
         $this->assertSame(60, $e->getClickHouseErrorCode()); // UNKNOWN_TABLE
         $this->assertSame(404, $e->getHttpStatus());
     }
