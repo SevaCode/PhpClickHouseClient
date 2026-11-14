@@ -100,7 +100,7 @@
 - [x] 6. Чтение по умолчанию POST + `readonly=2`, `Content-Type: text/plain` ([PR #10](https://github.com/sevacode/phpclickhouseclient/pull/10)).
 - [x] 7. `ping(): bool` без исключений ([PR #12](https://github.com/sevacode/phpclickhouseclient/pull/12)).
 - [x] 8. Иерархия исключений, `getCode()` = код ошибки ClickHouse ([PR #12](https://github.com/sevacode/phpclickhouseclient/pull/12)).
-- [ ] 9. `pool()` с объектами результата вместо callback `getJsonPool()`.
+- [x] 9. `pool()` с объектами результата вместо callback `getJsonPool()` ([PR #13](https://github.com/sevacode/phpclickhouseclient/pull/13)).
 - [x] 10. Минимум PHP 8.3 / Symfony 6.4 ([PR #8](https://github.com/sevacode/phpclickhouseclient/pull/8)).
 - ~~11. Переименование классов без префикса `Chc`~~ — отклонено, префикс остаётся.
 

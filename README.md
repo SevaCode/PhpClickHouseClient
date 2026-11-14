@@ -82,6 +82,16 @@ $writeClient->insert('db.events', $rowsGenerator);
 $writeClient->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
 ````
 
+Parallel JSON queries return a `ChcResult` per key, in the order of the input array:
+
+````php
+$results = $client->pool(['a' => 'SELECT 1 AS n', 'b' => 'SELECT 2 AS n']);
+$results['a']->data[0]['n']; // 1
+$results['b']->rows;         // also meta, totals, extremes, statistics, queryId, summary
+````
+
+`getJsonPool($queries, $callback)` is deprecated since 2.0 and will be removed in 3.0.
+
 Errors that ClickHouse sends in the middle of a stream are thrown as `ChcServerException` after the rows received
 before the error. `insert()` takes the table name as an identifier written into SQL as is — never pass user input.
 All requests use Symfony HttpClient; inject a configured client with `withHttpClient()` when needed.

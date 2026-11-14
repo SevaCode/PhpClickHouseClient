@@ -77,6 +77,30 @@ class ChcClientTest extends IntegrationTestCase
         $this->assertSame(395, $e->getCode());
     }
 
+    public function testPool(): void
+    {
+        $results = $this->client()->pool(['one' => 'SELECT toUInt8(1) AS n', 'two' => 'SELECT toUInt8(2) AS n']);
+
+        $this->assertSame(['one', 'two'], array_keys($results));
+        $this->assertSame([['n' => 1]], $results['one']->data);
+        $this->assertSame([['name' => 'n', 'type' => 'UInt8']], $results['one']->meta);
+        $this->assertSame(1, $results['two']->rows);
+        $this->assertSame(2, $results['two']->data[0]['n']);
+        $this->assertNotEmpty($results['one']->queryId);
+        $this->assertNotSame($results['one']->queryId, $results['two']->queryId);
+        $this->assertArrayHasKey('read_rows', $results['one']->summary ?? []);
+        $this->assertArrayHasKey('elapsed', $results['one']->statistics ?? []);
+    }
+
+    public function testPoolError(): void
+    {
+        $e = $this->caughtException(
+            fn() => $this->client()->pool(['ok' => 'SELECT 1', 'bad' => 'SELECT * FROM chc_no_such_table']),
+            ChcServerException::class,
+        );
+        $this->assertSame(60, $e->getCode());
+    }
+
     public function testJsonPool(): void
     {
         $result = $this->client()->getJsonPool(
