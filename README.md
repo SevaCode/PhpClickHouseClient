@@ -97,11 +97,15 @@ $client->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
 $client->setCompression(true);                              // Deprecated: use withCompression().
 $client->setHttpClient(Symfony\Component\HttpClient\HttpClient::create()); // Deprecated: use withHttpClient().
 $client->setPoolConcurrency(8);                             // Deprecated: use withPoolConcurrency().
+
+// Parallel JSON queries: a ChcResult per key, in the order of the input array
+$results = $client->pool(['a' => 'SELECT 1 AS n', 'b' => 'SELECT 2 AS n']);
+$results['a']->data[0]['n']; // 1; also meta, rows, totals, extremes, statistics, queryId, summary
 ````
 
 Errors that ClickHouse sends in the middle of a stream are thrown as `ChcException` after the rows received
 before the error. `insert()` takes the table name as an identifier written into SQL as is — never pass user input.
-`iterate()`, `insert()` and `getJsonPool()` always use Symfony HttpClient; other queries use it only after
+`iterate()`, `insert()`, `pool()` and `getJsonPool()` (deprecated: use `pool()`) always use Symfony HttpClient; other queries use it only after
 `setHttpClient()` (deprecated in 1.4; use `withHttpClient()` in new code).
 
 ## Query id, summary, sessions, retries, errors
