@@ -4,55 +4,38 @@
  * CreatedAt: 01.10.2018
  */
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Responses;
 
 class ChcResponse
 {
-    protected $format = '';
-    /**
-     * @var string
-     */
-    private $body;
+    protected ?string $format = null;
+    private string $body;
     /** @var string[] */
     private array $headerLines = [];
 
-    /**
-     * ChcResponse constructor.
-     * @param string $body
-     */
-    public function __construct($body = '')
+    public function __construct(string $body = '')
     {
         $this->body = $body;
     }
 
-    /**
-     * @return string
-     */
-    public function getBody()
+    public function getBody(): string
     {
         return $this->body;
     }
 
-    /**
-     * @param string $body
-     */
-    public function setBody($body)
+    public function setBody(string $body): void
     {
         $this->body = $body;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getResponse()
+    public function getResponse(): mixed
     {
         return $this->getBody();
     }
 
-    /**
-     * @return string
-     */
-    public function getFormat()
+    public function getFormat(): ?string
     {
         return $this->format;
     }

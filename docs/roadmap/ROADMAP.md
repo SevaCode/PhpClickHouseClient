@@ -94,8 +94,8 @@
 
 - [x] 1. Удалить устаревшие `HttpClient` и `Mode` ([PR #8](https://github.com/sevacode/phpclickhouseclient/pull/8)).
 - [x] 2. Единственный транспорт на Symfony HttpClient, удалить `ChcHttpTransport` ([PR #8](https://github.com/sevacode/phpclickhouseclient/pull/8)).
-- [ ] 3. `declare(strict_types=1)`, строгие типы в сигнатурах и свойствах.
-- [ ] 4. `ChcFormat` → `enum`.
+- [x] 3. `declare(strict_types=1)`, строгие типы в сигнатурах и свойствах ([PR #9](https://github.com/sevacode/phpclickhouseclient/pull/9)).
+- [x] 4. `ChcFormat` → `enum` ([PR #9](https://github.com/sevacode/phpclickhouseclient/pull/9)).
 - [ ] 5. Иммутабельный клиент (`with*()`).
 - [ ] 6. Чтение по умолчанию POST + `readonly=2`, `Content-Type: text/plain`.
 - [ ] 7. `ping(): bool` без исключений.

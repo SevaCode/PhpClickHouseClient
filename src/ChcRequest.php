@@ -4,72 +4,44 @@
  * CreatedAt: 01.10.2018
  */
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient;
 
 class ChcRequest
 {
-    /**
-     * @var array
-     */
-    private $settings;
-    /**
-     * @var string
-     */
-    private $query;
-    /**
-     * @var string
-     */
-    private $returnFormat;
+    private ?array $settings = null;
+    private ?string $query = null;
+    private ?string $returnFormat = null;
 
-    /**
-     * @return array
-     */
-    public function getSettings()
+    public function getSettings(): ?array
     {
         return $this->settings;
     }
 
-    /**
-     * @param array $settings
-     * @return $this
-     */
-    public function setSettings($settings)
+    public function setSettings(array $settings): self
     {
         $this->settings = $settings;
         return $this;
     }
 
-    /**
-     * @return string
-     */
-    public function getQuery()
+    public function getQuery(): ?string
     {
         return $this->query;
     }
 
-    /**
-     * @param string $query
-     * @return $this
-     */
-    public function setQuery($query)
+    public function setQuery(string $query): self
     {
         $this->query = $query;
         return $this;
     }
 
-    /**
-     * @return string
-     */
-    public function getReturnFormat()
+    public function getReturnFormat(): ?string
     {
         return $this->returnFormat;
     }
 
-    /**
-     * @param string $returnFormat
-     * @return $this
-     */
-    public function setReturnFormat($returnFormat)
+    public function setReturnFormat(?string $returnFormat): self
     {
         $this->returnFormat = $returnFormat;
         return $this;

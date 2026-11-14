@@ -1,9 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\ChcFormat;
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
 use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use SevaCode\ClickHouseClient\Tests\TestCase;
@@ -68,6 +71,48 @@ class DriverFeaturesTest extends TestCase
         $this->assertSame([['x' => 1]], $client->fetchAll('SELECT 1 AS x'));
         $this->assertSame('1b2c', $client->getLastQueryId());
         $this->assertSame(['read_rows' => '1', 'read_bytes' => '8'], $client->getLastQuerySummary());
+    }
+
+    public function testFormatArgumentsNormalizeEnumStringsAndNoFormat(): void
+    {
+        $requests = [];
+        $client = $this->client($requests, [
+            new MockResponse('ok'),
+            new MockResponse('ok'),
+            new MockResponse('ok'),
+            new MockResponse('ok'),
+            new MockResponse('ok'),
+        ]);
+
+        $client->getRaw('SELECT 1', ChcFormat::JSON);
+        $client->getRaw('SELECT 1', 'JSON');
+        $client->getRaw('SELECT 1');
+        $client->getRaw('SELECT 1', '');
+        $client->getRaw('SELECT 1', null);
+
+        $queries = array_map(static function (string $request): string {
+            parse_str((string)parse_url($request, PHP_URL_QUERY), $parameters);
+            return (string)($parameters['query'] ?? '');
+        }, $requests);
+
+        $this->assertSame([
+            'SELECT 1' . PHP_EOL . 'FORMAT JSON',
+            'SELECT 1' . PHP_EOL . 'FORMAT JSON',
+            'SELECT 1',
+            'SELECT 1',
+            'SELECT 1',
+        ], $queries);
+    }
+
+    public function testGetJsonReturnsDecodedJsonResponsePayload(): void
+    {
+        $client = $this->mockedClient(new MockResponse('{"data":[{"x":1}],"meta":[],"rows":1}'));
+
+        $this->assertSame([
+            'data' => [['x' => 1]],
+            'meta' => [],
+            'rows' => 1,
+        ], $client->getJson('SELECT 1 AS x'));
     }
 
     public function testSession(): void

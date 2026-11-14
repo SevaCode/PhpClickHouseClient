@@ -11,6 +11,8 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 ### Changed
 - All requests use Symfony HttpClient with a shared default client.
 - PHP >= 8.3; `symfony/http-client` `^6.4 || ^7.0`.
+- Strict types and native parameter, return, and property types throughout PHP source and tests.
+- `ChcFormat` is a backed enum; format arguments accept `ChcFormat|string|null`.
 
 ## [1.4]
 

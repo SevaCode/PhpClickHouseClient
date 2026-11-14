@@ -4,6 +4,8 @@
  * CreatedAt: 14.06.2024
  */
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Transports;
 
 use SevaCode\ClickHouseClient\ChcRequest;

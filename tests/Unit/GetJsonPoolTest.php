@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
 use SevaCode\ClickHouseClient\ChcException;

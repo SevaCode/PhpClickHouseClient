@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
 use SevaCode\ClickHouseClient\ChcRequest;
@@ -22,7 +24,7 @@ class ReadOnlyOverPostTest extends TestCase
         }, 'http://localhost:8123/');
         $transport = new ChcSymfonyCurlTransport($client);
         $configure($transport);
-        $req = (new ChcRequest())->setSettings($settings)->setQuery($query)->setReturnFormat('');
+        $req = (new ChcRequest())->setSettings($settings)->setQuery($query)->setReturnFormat(null);
         $transport->response($transport->request($req))->getResponse();
         return $captured;
     }

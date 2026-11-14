@@ -4,13 +4,15 @@
  * CreatedAt: 28.06.2016
  */
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient;
 
-class ChcFormat
+enum ChcFormat: string
 {
-    const TabSeparated = 'TabSeparated';
-    const TabSeparatedWithNames = 'TabSeparatedWithNames';
-    const JSON = 'JSON';
-    const JSONEachRow = 'JSONEachRow';
-    const Pretty = 'Pretty';
+    case TabSeparated = 'TabSeparated';
+    case TabSeparatedWithNames = 'TabSeparatedWithNames';
+    case JSON = 'JSON';
+    case JSONEachRow = 'JSONEachRow';
+    case Pretty = 'Pretty';
 }

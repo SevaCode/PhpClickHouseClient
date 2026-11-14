@@ -43,4 +43,17 @@ Code that instantiated `Transports\ChcHttpTransport` should use `ChcClient` inst
 
 PHP 8.3 or newer is required, with `symfony/http-client` version `^6.4 || ^7.0`.
 
+### Strict types (ADR-0002 #3)
+
+Every PHP file declares `strict_types=1`, and public methods use native parameter and return types.
+Passing a value of the wrong type (for example, an integer where a string is expected) now throws
+`TypeError`. `getLastQueryLatency()` returns `?float`: it is `null` before the first query.
+
+### ChcFormat is an enum (ADR-0002 #4)
+
+`ChcFormat::JSON` and the other format names are enum cases. Format arguments accept
+`ChcFormat|string|null`: `null` means no `FORMAT` clause, and `''` remains accepted as a no-format
+value. Code that used a format constant as a string, such as `'FORMAT ' . ChcFormat::JSON`, must
+use its backed value: `'FORMAT ' . ChcFormat::JSON->value`.
+
 _Other accepted ADR-0002 items are added as they are implemented._

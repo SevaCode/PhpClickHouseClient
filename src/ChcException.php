@@ -4,6 +4,8 @@
  * CreatedAt: 01.10.2018
  */
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient;
 
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
@@ -14,10 +16,7 @@ use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
 class ChcException extends \Exception
 {
-    /**
-     * @var string
-     */
-    private $query;
+    private ?string $query = null;
     private ?int $httpStatus = null;
     private ?int $clickHouseErrorCode = null;
 
@@ -84,18 +83,12 @@ class ChcException extends \Exception
         return $this->clickHouseErrorCode;
     }
 
-    /**
-     * @return string
-     */
-    public function getQuery()
+    public function getQuery(): ?string
     {
         return $this->query;
     }
 
-    /**
-     * @param string $query
-     */
-    public function setQuery($query)
+    public function setQuery(string $query): void
     {
         $this->query = $query;
     }

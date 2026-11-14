@@ -4,34 +4,25 @@
  * CreatedAt: 01.10.2018
  */
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Responses;
 
 use SevaCode\ClickHouseClient\ChcFormat;
 
 class ChcResponseFactory
 {
-    /**
-     * @var string
-     */
-    private $format;
+    private ?string $format;
 
-    /**
-     * ChcResponseFactory constructor.
-     * @param string $format
-     */
-    public function __construct($format = '')
+    public function __construct(?string $format = null)
     {
         $this->format = $format;
     }
 
-    /**
-     * @param string $body
-     * @return ChcResponse
-     */
-    public function make($body = '', int $httpStatus = 0, ?string $query = null)
+    public function make(string $body = '', int $httpStatus = 0, ?string $query = null): ChcResponse
     {
         switch ($this->format) {
-            case ChcFormat::JSON:
+            case ChcFormat::JSON->value:
                 return new ChcJsonResponse($body, $httpStatus, $query);
 
             default:
