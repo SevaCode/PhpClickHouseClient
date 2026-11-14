@@ -7,8 +7,13 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 
 ### Deprecated
 - `HttpClient`, `Mode`, `Transports\ChcHttpTransport`, and `ChcClient::setReadOnlyOverPost()` are removed in 2.0; see ADR-0002.
+- `ChcClient::readOnly()`, `setDatabase()`, `addSettings()`, `setCredentials()`, `setTimeout()`,
+  `setHttpClient()`, `setCompression()`, `setPoolConcurrency()`, `setRetries()`, `setSessionId()`,
+  `setUrl()`, and `setSqlLogger()`; use the corresponding `with*()` method (or `getReadOnly()`).
 
 ### Added
+- Immutable `ChcClient::with*()` configuration methods, constructor `(url, httpClient)`, and `getReadOnly()`.
+- `ChcReadOnly` enum (`Disabled`, `Strict`, `AllowSettings`); `withReadOnly()` accepts it or an int 0–2.
 - Server-side query parameters (`{name:Type}` + `ChcParamEncoder`) and `fetchAll()`, `fetchRow()`,
   `fetchOne()`, `fetchColumn()`, `write()` with per-query settings.
 - `setCredentials()`, `setTimeout()`, opt-in `setReadOnlyOverPost()`.
