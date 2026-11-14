@@ -17,12 +17,33 @@ use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
+/**
+ * Base class of every exception thrown by the client; `catch (ChcException)` catches them all.
+ *
+ *     ChcException                          other failures, e.g. a malformed 200 response
+ *     ├── ChcServerException                ClickHouse returned an error (Code: N)
+ *     │   ├── ChcMemoryLimitExceededException   241
+ *     │   └── ChcTimeoutExceededException       159, server-side timeout
+ *     ├── ChcConnectionException            no complete HTTP response (network, TLS, broken connection)
+ *     │   └── ChcClientTimeoutException     HTTP client timeout
+ *     └── ChcHttpException                  HTTP status >= 300 without a ClickHouse error code
+ *
+ * getCode() is the ClickHouse error code or 0; getHttpStatus() is the HTTP status.
+ */
 class ChcException extends \Exception
 {
     private ?string $query = null;
     private ?int $httpStatus = null;
     private ?int $clickHouseErrorCode = null;
 
+    /**
+     * Builds the most specific exception: client timeout, then ClickHouse error code
+     * (from `Code: N` or the error name), then transport failure, then HTTP status >= 300.
+     *
+     * @param int|string $code HTTP status of the response, 0 if there was none
+     * @param ?\Throwable $previous the Symfony HttpClient exception, if any
+     * @param ?string $query SQL that failed, available through getQuery()
+     */
     public static function create(string $message = '', int|string $code = 0, ?\Throwable $previous = null, ?string $query = null): self
     {
         $httpStatus = is_numeric($code) && $code >= 100 && $code <= 599 ? (int)$code : null;
@@ -93,6 +114,9 @@ class ChcException extends \Exception
         return $this->clickHouseErrorCode;
     }
 
+    /**
+     * SQL of the failed request, null when unknown.
+     */
     public function getQuery(): ?string
     {
         return $this->query;
