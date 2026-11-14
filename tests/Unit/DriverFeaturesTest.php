@@ -11,6 +11,7 @@ use Symfony\Component\HttpClient\Exception\TimeoutException;
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class DriverFeaturesTest extends TestCase
 {
@@ -130,9 +131,26 @@ class DriverFeaturesTest extends TestCase
         $this->assertTrue($this->client($requests, [new MockResponse("Ok.\n")])->isAlive());
         $this->assertFalse($this->client($requests, [new TransportException('Connection refused')])->isAlive());
         $this->assertFalse($this->client($requests, [new MockResponse('', ['http_code' => 503])])->isAlive());
+    }
 
-        $client = new ChcClient();
-        $client->setUrl('http://127.0.0.1:1/');
-        $this->assertFalse(@$client->isAlive());
+    public function testDefaultHttpClientIsReusedAndResetWhenUrlChanges(): void
+    {
+        $client = new class extends ChcClient {
+            public int $clientCreations = 0;
+
+            protected function createHttpClient(): HttpClientInterface
+            {
+                $this->clientCreations++;
+                return new MockHttpClient(static fn() => new MockResponse('1'), $this->url);
+            }
+        };
+
+        $client->getRaw('SELECT 1');
+        $client->getRaw('SELECT 1');
+        $this->assertSame(1, $client->clientCreations);
+
+        $client->setUrl('http://localhost:8124/');
+        $client->getRaw('SELECT 1');
+        $this->assertSame(2, $client->clientCreations);
     }
 }

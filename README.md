@@ -1,6 +1,10 @@
 # PhpClickHouseClient
 PHP Client for [ClickHouse](https://github.com/ClickHouse/ClickHouse) HTTP interface
 
+## Requirements
+
+PHP 8.3+ and `symfony/http-client` `^6.4 || ^7.0`.
+
 # Use examples
 ````php
 $data = (new ChcClient())->getJsonData($query);
@@ -72,7 +76,7 @@ $client->setPoolConcurrency(8);                             // getJsonPool(): at
 
 Errors that ClickHouse sends in the middle of a stream are thrown as `ChcException` after the rows received
 before the error. `insert()` takes the table name as an identifier written into SQL as is — never pass user input.
-`iterate()`, `insert()` and `getJsonPool()` always use Symfony HttpClient; other queries use it only after `setHttpClient()`.
+All requests use Symfony HttpClient; inject a configured client with `setHttpClient()` when needed.
 
 ## Query id, summary, sessions, retries, errors
 

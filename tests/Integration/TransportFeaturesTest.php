@@ -13,7 +13,7 @@ class TransportFeaturesTest extends IntegrationTestCase
      */
     public static function transports(): iterable
     {
-        yield 'native' => [false];
+        yield 'default client' => [false];
         yield 'symfony' => [true];
     }
 
