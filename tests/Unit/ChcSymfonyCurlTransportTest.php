@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
 use SevaCode\ClickHouseClient\ChcException;
@@ -45,18 +47,18 @@ class ChcSymfonyCurlTransportTest extends TestCase
     {
         $make = function (array $info) {
             $transport = new ChcSymfonyCurlTransport(new MockHttpClient(new MockResponse('{"data":[{"x":1}],"rows":1}', $info)));
-            $req = (new ChcRequest())->setSettings([])->setQuery('SELECT 1 FORMAT JSON')->setReturnFormat('');
+            $req = (new ChcRequest())->setSettings([])->setQuery('SELECT 1 FORMAT JSON')->setReturnFormat(null);
             return $transport->response($transport->request($req));
         };
 
         // Заголовок есть — реальный формат сервера важнее returnFormat
         $response = $make(['http_code' => 200, 'response_headers' => [0 => 'HTTP/1.1 200 OK', 'x-clickhouse-format' => 'JSON']]);
-        $this->assertSame(ChcFormat::JSON, $response->getFormat());
+        $this->assertSame(ChcFormat::JSON->value, $response->getFormat());
         $this->assertSame([['x' => 1]], $response->getResponse()['data']);
 
         // Заголовка нет (DDL/ping/старый сервер) — fallback на returnFormat
         $response = $make(['http_code' => 200]);
-        $this->assertSame('', $response->getFormat());
+        $this->assertNull($response->getFormat());
         $this->assertSame('{"data":[{"x":1}],"rows":1}', $response->getResponse());
 
         // Сервер сказал TabSeparated — сырой ответ, не JSON-парсер
@@ -64,9 +66,9 @@ class ChcSymfonyCurlTransportTest extends TestCase
             'http_code' => 200,
             'response_headers' => [0 => 'HTTP/1.1 200 OK', 'x-clickhouse-format' => 'TabSeparated'],
         ])));
-        $req = (new ChcRequest())->setSettings([])->setQuery('SELECT 1')->setReturnFormat('');
+        $req = (new ChcRequest())->setSettings([])->setQuery('SELECT 1')->setReturnFormat(null);
         $response = $transport->response($transport->request($req));
-        $this->assertSame('', $response->getFormat());
+        $this->assertNull($response->getFormat());
         $this->assertSame('{"data":[]}', $response->getResponse());
     }
 

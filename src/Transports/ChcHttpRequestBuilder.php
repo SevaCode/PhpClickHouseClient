@@ -20,7 +20,7 @@ final class ChcHttpRequestBuilder
         bool $readOnlyOverPost = false,
         bool $compression = false,
     ): ChcHttpRequest {
-        $values = $request->getSettings();
+        $values = $request->getSettings() ?? [];
         $query = (string)$request->getQuery();
         $headers = [];
 

@@ -4,6 +4,8 @@
  * CreatedAt: 01.10.2018
  */
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient;
 
 use Psr\Log\LoggerInterface;
@@ -18,20 +20,18 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class ChcClient
 {
-    protected $url = 'http://localhost:8123/';
-    protected $settings = [
+    protected string $url = 'http://localhost:8123/';
+    /** @var array<string, mixed> */
+    protected array $settings = [
         //'database' => 'default',
         //'max_memory_usage' => 100000000,
         //'max_rows_to_group_by' => 2000000,
     ];
 
-    protected $isReadOnly = true;
+    protected bool $isReadOnly = true;
 
-    /**
-     * seconds
-     * @var float
-     */
-    protected $last_query_latency;
+    /** Query latency in seconds. */
+    protected ?float $last_query_latency = null;
 
     private ?LoggerInterface $sqlLogger = null;
     private ?float $timeout = null;
@@ -45,30 +45,23 @@ class ChcClient
     /** @var string[]|null */
     private ?array $lastHeaderLines = null;
 
-    /**
-     * @param boolean|null $isReadOnly
-     * @return bool
-     */
-    public function readOnly($isReadOnly = null)
+    public function readOnly(?bool $isReadOnly = null): bool
     {
         $old = $this->isReadOnly;
 
-        if (!is_null($isReadOnly)) {
-            $this->isReadOnly = (boolean)$isReadOnly;
+        if (null !== $isReadOnly) {
+            $this->isReadOnly = $isReadOnly;
         }
 
         return $old;
     }
 
-    public function setDatabase($database)
+    public function setDatabase(string $database): void
     {
         $this->settings['database'] = $database;
     }
 
-    /**
-     * @param array $settings
-     */
-    public function addSettings($settings)
+    public function addSettings(array $settings): void
     {
         $this->settings = array_merge($this->settings, $settings);
     }
@@ -189,32 +182,23 @@ class ChcClient
         }
     }
 
-    /**
-     * @param string $url
-     */
-    public function setUrl($url)
+    public function setUrl(string $url): void
     {
         $this->url = $url;
         $this->defaultHttpClient = null;
     }
 
     /**
-     * seconds
-     * @return float
+     * Query latency in seconds; null before the first query.
      */
-    public function getLastQueryLatency()
+    public function getLastQueryLatency(): ?float
     {
         return $this->last_query_latency;
     }
 
-    /**
-     * @param $query
-     * @param string $format
-     * @return ChcRequest
-     */
-    protected function makeRequest($query, $format = '')
+    protected function makeRequest(string $query, ?string $format = null): ChcRequest
     {
-        $this->logSql((string)$query);
+        $this->logSql($query);
 
         return (new ChcRequest)
             ->setSettings($this->settings)
@@ -223,8 +207,6 @@ class ChcClient
     }
 
     /**
-     * @param ChcRequest $request
-     * @return Responses\ChcResponse
      * @throws ChcException
      */
     protected function runRequest(ChcRequest $request): ChcResponse
@@ -271,66 +253,51 @@ class ChcClient
         }
     }
 
-    /**
-     * @param string $query
-     * @param string $returnFormat
-     * @return ChcResponse
-     */
-    public function execute($query, $returnFormat = '')
+    public function execute(string $query, ChcFormat|string|null $returnFormat = null): ChcResponse
     {
-        return $this->runRequest($this->makeRequest($query, $returnFormat));
+        return $this->runRequest($this->makeRequest($query, $this->normalizeFormat($returnFormat)));
     }
 
-    /**
-     * @param string $query
-     * @param string $returnFormat
-     * @return string
-     */
-    public function getRaw($query, $returnFormat = '')
+    public function getRaw(string $query, ChcFormat|string|null $returnFormat = null): string
     {
         return $this->select($query, $returnFormat)->getBody();
     }
 
-    /**
-     * @param string $query
-     * @return array
-     */
-    public function getJson($query)
+    public function getJson(string $query): array
     {
         return $this->select($query, ChcFormat::JSON)->getResponse();
     }
 
-    /**
-     * @param string $query
-     * @return array|null
-     */
-    public function getJsonData($query)
+    public function getJsonData(string $query): ?array
     {
         return $this->getJson($query)['data'];
     }
 
     /**
-     * @return bool
      * @throws ChcException when the server is unreachable
      */
-    public function ping()
+    public function ping(): bool
     {
         return $this->getRaw('') === ('Ok.' . PHP_EOL);
     }
 
-    /**
-     * @param string $query
-     * @param string $format
-     * @return ChcResponse
-     */
-    private function select($query, $format)
+    private function select(string $query, ChcFormat|string|null $format): ChcResponse
     {
-        return $this->execute($query . $this->getQueryFormatPostfix($format), $format);
+        $format = $this->normalizeFormat($format);
+        return $this->runRequest($this->makeRequest($query . $this->getQueryFormatPostfix($format), $format));
     }
 
-    private function getQueryFormatPostfix($format)
+    private function normalizeFormat(ChcFormat|string|null $format): ?string
     {
-        return $format ? PHP_EOL . 'FORMAT ' . $format : '';
+        if ($format instanceof ChcFormat) {
+            return $format->value;
+        }
+        return '' === $format ? null : $format;
+    }
+
+    private function getQueryFormatPostfix(?string $format): string
+    {
+        return null !== $format ? PHP_EOL . 'FORMAT ' . $format : '';
     }
 
     /**
@@ -401,7 +368,7 @@ class ChcClient
      */
     public function write(string $sql, array $params = [], array $settings = []): ChcResponse
     {
-        return $this->runRequest($this->makeParamRequest($sql, $params, $settings, ''));
+        return $this->runRequest($this->makeParamRequest($sql, $params, $settings, null));
     }
 
     /**
@@ -411,15 +378,15 @@ class ChcClient
      */
     private function fetchJson(string $sql, array $params, array $settings): array
     {
-        $sql .= $this->getQueryFormatPostfix(ChcFormat::JSON);
-        return $this->runRequest($this->makeParamRequest($sql, $params, $settings, ChcFormat::JSON))->getResponse();
+        $sql .= $this->getQueryFormatPostfix(ChcFormat::JSON->value);
+        return $this->runRequest($this->makeParamRequest($sql, $params, $settings, ChcFormat::JSON->value))->getResponse();
     }
 
     /**
      * @param array<string, mixed> $params
      * @param array<string, mixed> $settings
      */
-    private function makeParamRequest(string $sql, array $params, array $settings, string $format): ChcRequest
+    private function makeParamRequest(string $sql, array $params, array $settings, ?string $format): ChcRequest
     {
         $this->logSql($sql);
 
@@ -435,11 +402,10 @@ class ChcClient
      *
      * @param array<string> $queries
      * @param callable(array $data, array $meta, int $rows, ?int $rows_before_limit_at_least, ?array $statistics, ?array $totals, mixed $extremes, float $start_time): mixed $callback
-     * @return array
      */
     public function getJsonPool(array $queries, callable $callback): array
     {
-        $formatPostfix = $this->getQueryFormatPostfix(ChcFormat::JSON);
+        $formatPostfix = $this->getQueryFormatPostfix(ChcFormat::JSON->value);
         $transport = $this->symfonyTransport();
         $timeStart = microtime(true);
 
@@ -450,7 +416,7 @@ class ChcClient
             if (!isset($keys[$i])) {
                 return;
             }
-            $request = $this->makeRequest($queries[$keys[$i]] . $formatPostfix, ChcFormat::JSON);
+            $request = $this->makeRequest($queries[$keys[$i]] . $formatPostfix, ChcFormat::JSON->value);
             try {
                 $responses[$i] = $transport->request($request);
             } catch (TransportExceptionInterface $e) {
@@ -519,7 +485,7 @@ class ChcClient
      */
     public function iterate(string $sql, array $params = [], array $settings = []): \Generator
     {
-        $request = $this->makeParamRequest($sql . $this->getQueryFormatPostfix(ChcFormat::JSONEachRow), $params, $settings, ChcFormat::JSONEachRow);
+        $request = $this->makeParamRequest($sql . $this->getQueryFormatPostfix(ChcFormat::JSONEachRow->value), $params, $settings, ChcFormat::JSONEachRow->value);
         $transport = $this->symfonyTransport();
         $timeStart = microtime(true);
 
@@ -574,14 +540,14 @@ class ChcClient
                 $columns,
             )) . ')';
         }
-        $sql .= ' FORMAT ' . ChcFormat::JSONEachRow;
+        $sql .= ' FORMAT ' . ChcFormat::JSONEachRow->value;
         $this->logSql($sql);
 
         $settings = array_merge($this->settings, $settings);
         if ($this->isReadOnly && !isset($settings['readonly'])) {
             $settings['readonly'] = 2;
         }
-        $request = (new ChcRequest)->setSettings($settings)->setQuery($sql)->setReturnFormat('');
+        $request = (new ChcRequest)->setSettings($settings)->setQuery($sql)->setReturnFormat(null);
 
         $transport = $this->symfonyTransport();
         $timeStart = microtime(true);

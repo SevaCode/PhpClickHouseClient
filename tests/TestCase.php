@@ -1,10 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Tests;
 
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
-use SevaCode\ClickHouseClient\ChcFormat;
 use SevaCode\ClickHouseClient\ChcRequest;
 use SevaCode\ClickHouseClient\Responses\ChcResponse;
 use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;
@@ -30,7 +31,7 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         $this->fail('Expected ' . $class);
     }
 
-    protected function request(string $query = 'query-context', string $format = ChcFormat::JSON): ChcRequest
+    protected function request(string $query = 'query-context', string $format = 'JSON'): ChcRequest
     {
         return (new ChcRequest())->setSettings([])->setQuery($query)->setReturnFormat($format);
     }

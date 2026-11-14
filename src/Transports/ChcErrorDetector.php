@@ -4,6 +4,8 @@
  * CreatedAt: 13.11.2026
  */
 
+declare(strict_types=1);
+
 namespace SevaCode\ClickHouseClient\Transports;
 
 use SevaCode\ClickHouseClient\ChcException;
@@ -192,9 +194,9 @@ class ChcErrorDetector
 
     /**
      * Ищет сигнатуру ClickHouse-исключения в последних TAIL_SIZE байтах тела.
+     * Returns null if the tail contains no error signature.
      *
      * @param string[] $checks подмножество ['json', 'plain', 'xml'] — см. checksFor()
-     * @return ChcException|null null — если в хвосте тела нет сигнатуры ошибки ClickHouse
      */
     public static function detect(string $body, int $httpStatus, array $checks, ?string $query): ?ChcException
     {
