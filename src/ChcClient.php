@@ -48,8 +48,8 @@ class ChcClient
 
     public function __construct(string $url = 'http://localhost:8123/', ?HttpClientInterface $httpClient = null)
     {
-        $this->setUrl($url);
-        $this->setHttpClient($httpClient);
+        $this->url = $url;
+        $this->httpClient = $httpClient;
     }
 
     public function withUrl(string $url): static
