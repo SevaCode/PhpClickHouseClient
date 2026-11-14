@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcFormat;
@@ -23,16 +24,14 @@ class DriverFeaturesTest extends TestCase
      */
     private function client(array &$requests, array $responses): ChcClient
     {
-        $client = new ChcClient();
-        $client->setHttpClient(new MockHttpClient(function (string $method, string $url) use (&$requests, &$responses) {
-            $requests[] = $url;
+        return new ChcClient('http://localhost:8123/', new MockHttpClient(function (string $method, string $url, array $options) use (&$requests, &$responses) {
+            $requests[] = [$method, $url, $options];
             $next = array_shift($responses);
             if ($next instanceof \Throwable) {
                 throw $next;
             }
             return $next;
         }));
-        return $client;
     }
 
     public function testExceptionCodes(): void
@@ -90,10 +89,7 @@ class DriverFeaturesTest extends TestCase
         $client->getRaw('SELECT 1', '');
         $client->getRaw('SELECT 1', null);
 
-        $queries = array_map(static function (string $request): string {
-            parse_str((string)parse_url($request, PHP_URL_QUERY), $parameters);
-            return (string)($parameters['query'] ?? '');
-        }, $requests);
+        $queries = array_map(static fn(array $request): string => (string)$request[2]['body'], $requests);
 
         $this->assertSame([
             'SELECT 1' . PHP_EOL . 'FORMAT JSON',
@@ -119,13 +115,13 @@ class DriverFeaturesTest extends TestCase
     {
         $requests = [];
         $client = $this->client($requests, [new MockResponse('1'), new MockResponse('1')]);
-        $client->setSessionId('s1', 60);
+        $client = $client->withSession('s1', 60);
         $client->getRaw('SELECT 1');
-        $client->setSessionId(null);
+        $client = $client->withSession(null);
         $client->getRaw('SELECT 1');
-        $this->assertStringContainsString('session_id=s1', $requests[0]);
-        $this->assertStringContainsString('session_timeout=60', $requests[0]);
-        $this->assertStringNotContainsString('session', $requests[1]);
+        $this->assertStringContainsString('session_id=s1', $requests[0][1]);
+        $this->assertStringContainsString('session_timeout=60', $requests[0][1]);
+        $this->assertStringNotContainsString('session', $requests[1][1]);
     }
 
     public function testRetriesReadOnlyOnly(): void
@@ -136,14 +132,14 @@ class DriverFeaturesTest extends TestCase
             new TransportException('Connection refused'),
             new MockResponse('ok', ['http_code' => 200]),
         ]);
-        $client->setRetries(2, 0);
+        $client = $client->withRetries(2, 0);
         $this->assertSame('ok', $client->getRaw('SELECT 1'));
         $this->assertCount(3, $requests);
 
         // Not retried: retries exhausted
         $requests = [];
         $client = $this->client($requests, [new MockResponse('', ['http_code' => 503]), new MockResponse('', ['http_code' => 503])]);
-        $client->setRetries(1, 0);
+        $client = $client->withRetries(1, 0);
         $e = $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcException::class);
         $this->assertSame(503, $e->getHttpStatus());
         $this->assertCount(2, $requests);
@@ -151,15 +147,14 @@ class DriverFeaturesTest extends TestCase
         // Not retried: write
         $requests = [];
         $client = $this->client($requests, [new MockResponse('', ['http_code' => 503]), new MockResponse('ok')]);
-        $client->setRetries(3, 0);
-        $client->readOnly(false);
+        $client = $client->withRetries(3, 0)->withReadOnly(ChcReadOnly::Disabled);
         $this->caughtException(fn() => $client->execute('INSERT INTO t VALUES (1)'), ChcException::class);
         $this->assertCount(1, $requests);
 
         // Not retried: ClickHouse error
         $requests = [];
         $client = $this->client($requests, [new MockResponse('Code: 60. DB::Exception: Unknown table', ['http_code' => 404]), new MockResponse('ok')]);
-        $client->setRetries(3, 0);
+        $client = $client->withRetries(3, 0);
         $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcException::class);
         $this->assertCount(1, $requests);
 
@@ -180,15 +175,13 @@ class DriverFeaturesTest extends TestCase
 
     public function testDefaultHttpClientIsAliveReturnsFalseWhenConnectionFails(): void
     {
-        $client = new ChcClient();
-        $client->setUrl('http://127.0.0.1:1/');
+        $client = new ChcClient('http://127.0.0.1:1/');
         $this->assertFalse(@$client->isAlive());
     }
 
     public function testDefaultHttpClientConnectionFailureThrowsChcConnectionException(): void
     {
-        $client = new ChcClient();
-        $client->setUrl('http://127.0.0.1:1/');
+        $client = new ChcClient('http://127.0.0.1:1/');
         $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcConnectionException::class);
     }
 
@@ -208,8 +201,15 @@ class DriverFeaturesTest extends TestCase
         $client->getRaw('SELECT 1');
         $this->assertSame(1, $client->clientCreations);
 
-        $client->setUrl('http://localhost:8124/');
+        $original = $client;
+        $client = $client->withSettings(['max_threads' => 2]);
+        $client->getRaw('SELECT 1');
+        $this->assertSame(1, $client->clientCreations);
+        $this->assertSame(1, $original->clientCreations);
+
+        $client = $client->withUrl('http://localhost:8124/');
         $client->getRaw('SELECT 1');
         $this->assertSame(2, $client->clientCreations);
+        $this->assertSame(1, $original->clientCreations);
     }
 }

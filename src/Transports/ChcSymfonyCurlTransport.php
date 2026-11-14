@@ -19,8 +19,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class ChcSymfonyCurlTransport
 {
     private HttpClientInterface $client;
-    private bool $readOnly = true;
-    private bool $readOnlyOverPost = false;
+    private int $readOnlyLevel = 2;
     private ?float $timeout = null;
     private bool $compression = false;
     /** @var array<string, mixed> */
@@ -33,7 +32,7 @@ class ChcSymfonyCurlTransport
 
     public function request(ChcRequest $request): ExtendedSymfonyHttpResponse
     {
-        $http = ChcHttpRequestBuilder::build($request, $this->readOnly, $this->readOnlyOverPost, $this->compression);
+        $http = ChcHttpRequestBuilder::build($request, $this->readOnlyLevel, $this->compression);
 
         // gzip-ответ (enable_http_compression=1) Symfony HttpClient распаковывает сам
         $options = $this->options;
@@ -68,11 +67,11 @@ class ChcSymfonyCurlTransport
      */
     public function insert(ChcRequest $request, iterable $body, bool $gzip = false): ExtendedSymfonyHttpResponse
     {
-        $http = ChcHttpRequestBuilder::build($request, false);
+        $http = ChcHttpRequestBuilder::build($request, 0);
         $query = (string)$request->getQuery();
 
         $headers = $http->headers;
-        unset($headers['Content-type']);
+        unset($headers['Content-Type']);
         if ($gzip) {
             $headers['Content-Encoding'] = 'gzip';
         }
@@ -135,9 +134,9 @@ class ChcSymfonyCurlTransport
         return $chcResponse;
     }
 
-    public function setReadOnly(bool $isReadOnly): static
+    public function setReadOnlyLevel(int $readOnlyLevel): static
     {
-        $this->readOnly = $isReadOnly;
+        $this->readOnlyLevel = $readOnlyLevel;
         return $this;
     }
 
@@ -158,12 +157,6 @@ class ChcSymfonyCurlTransport
     public function setOptions(array $options): static
     {
         $this->options = $options;
-        return $this;
-    }
-
-    public function setReadOnlyOverPost(bool $readOnlyOverPost): static
-    {
-        $this->readOnlyOverPost = $readOnlyOverPost;
         return $this;
     }
 

@@ -20,9 +20,8 @@ class GetJsonPoolTest extends TestCase
     private function poolFailure(callable $respond, string $class): ChcException
     {
         $sentQuery = null;
-        $client = $this->mockedClient(function ($method, $url) use (&$sentQuery, $respond) {
-            parse_str((string)parse_url($url, PHP_URL_QUERY), $params);
-            $sentQuery = $params['query'] ?? null;
+        $client = $this->mockedClient(function ($method, $url, $options) use (&$sentQuery, $respond) {
+            $sentQuery = $options['body'] ?? null;
             return $respond();
         });
         $e = $this->caughtException(
@@ -45,9 +44,8 @@ class GetJsonPoolTest extends TestCase
 
     public function testPreservesQueryKeys(): void
     {
-        $client = $this->mockedClient(function ($method, $url) {
-            parse_str((string)parse_url($url, PHP_URL_QUERY), $params);
-            $n = (int)$params['query'];
+        $client = $this->mockedClient(function ($method, $url, $options) {
+            $n = (int)$options['body'];
             return new MockResponse('{"data":[{"n":' . $n . '}],"meta":[],"rows":1}', ['http_code' => 200]);
         });
         $result = $client->getJsonPool(['b' => '2', 'a' => '1'], fn($data) => $data[0]['n']);

@@ -19,14 +19,14 @@
 ### HttpClient and Mode removed (ADR-0002 #1)
 
 Use `ChcClient` instead of the `HttpClient` wrapper. `Mode::READONLY` and `Mode::WRITE` are replaced
-by the boolean `readOnly()` API:
+by read-only levels:
 
 ```php
-$client = new ChcClient();
-$client->readOnly(false); // replaces setMode(Mode::WRITE)
+$client = (new ChcClient())->withReadOnly(ChcReadOnly::Disabled); // replaces Mode::WRITE
 ```
 
-- `getMode()` → `$client->readOnly()`; `setMode(Mode::READONLY|Mode::WRITE)` → `$client->readOnly(true|false)`.
+- `getMode()` → `$client->getReadOnly()`; `setMode(Mode::READONLY|Mode::WRITE)` →
+  `$client = $client->withReadOnly(ChcReadOnly::AllowSettings|ChcReadOnly::Disabled)`.
 - `getData($query)` → `$client->getJsonData($query)`.
 - `query($query)` → `$client->getRaw($query, $format)` for reads or
   `$client->execute($query, $format)->getBody()` for writes.
@@ -36,7 +36,7 @@ $client->readOnly(false); // replaces setMode(Mode::WRITE)
 ### Native transport removed (ADR-0002 #2)
 
 All requests go through Symfony HttpClient, which is already a dependency. The default is a shared
-`HttpClient::create()` client with keep-alive. Inject a configured client with `setHttpClient()`.
+`HttpClient::create()` client with keep-alive. Inject a configured client with `withHttpClient()`.
 Code that instantiated `Transports\ChcHttpTransport` should use `ChcClient` instead.
 
 ### PHP 8.3+ and symfony/http-client ^6.4 || ^7.0 (ADR-0002 #10)
@@ -55,5 +55,45 @@ Passing a value of the wrong type (for example, an integer where a string is exp
 `ChcFormat|string|null`: `null` means no `FORMAT` clause, and `''` remains accepted as a no-format
 value. Code that used a format constant as a string, such as `'FORMAT ' . ChcFormat::JSON`, must
 use its backed value: `'FORMAT ' . ChcFormat::JSON->value`.
+
+### Immutable client (ADR-0002 #5)
+
+`ChcClient` configuration is immutable: each `withX()` method returns a clone. Assign the result;
+otherwise the original client remains unchanged:
+
+```php
+$client = $client->withDatabase('analytics')->withReadOnly(ChcReadOnly::Disabled);
+```
+
+| Removed method | Replacement |
+| --- | --- |
+| `setUrl($url)` | `$client = $client->withUrl($url)` |
+| `setDatabase($database)` | `$client = $client->withDatabase($database)` |
+| `addSettings($settings)` | `$client = $client->withSettings($settings)` |
+| `setCredentials($user, $password)` | `$client = $client->withCredentials($user, $password)` |
+| `setTimeout($seconds)` | `$client = $client->withTimeout($seconds)` |
+| `readOnly($value)` | `$client = $client->withReadOnly(ChcReadOnly::AllowSettings)` / `withReadOnly(ChcReadOnly::Disabled)`; `getReadOnly()` returns `ChcReadOnly` |
+| `setCompression($enabled)` | `$client = $client->withCompression($enabled)` |
+| `setHttpClient($httpClient)` | `$client = $client->withHttpClient($httpClient)` |
+| `setPoolConcurrency($concurrency)` | `$client = $client->withPoolConcurrency($concurrency)` |
+| `setRetries($count, $delaySeconds)` | `$client = $client->withRetries($count, $delaySeconds)` |
+| `setSessionId($id, $timeoutSeconds)` | `$client = $client->withSession($id, $timeoutSeconds)` |
+| `setSqlLogger($logger)` | `$client = $client->withSqlLogger($logger)` |
+| `setReadOnlyOverPost($enabled)` | Removed; reads use POST by default (see below) |
+
+`withReadOnly()` accepts the `ChcReadOnly` enum or its integer value 0–2; other integers throw
+`InvalidArgumentException`. `ChcReadOnly::Disabled` (0) allows writes and sends no `readonly` parameter;
+`Strict` (1) and `AllowSettings` (2) send the corresponding ClickHouse setting. The default is `AllowSettings`.
+
+### Reads over POST with readonly=2 (ADR-0002 #6)
+
+Non-ping queries now use POST with SQL in the body and
+`Content-Type: text/plain; charset=UTF-8`; SQL is no longer sent in the URL. Ping remains GET `/ping`.
+`setReadOnlyOverPost()` is removed because POST is the default. Read-only level `2` is the default.
+
+If your user profile sets `readonly=1`, the default request can fail with Code 164,
+`Cannot modify 'readonly' setting in readonly mode`. Use `$client = $client->withReadOnly(ChcReadOnly::Strict);`.
+An explicit setting passed with `$client = $client->withSettings(['readonly' => 1])` is also preserved.
+See [ClickHouse query permissions](https://clickhouse.com/docs/operations/settings/permissions-for-queries).
 
 _Other accepted ADR-0002 items are added as they are implemented._

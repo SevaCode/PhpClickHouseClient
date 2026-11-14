@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcFormat;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
@@ -26,8 +27,7 @@ class ChcClientTest extends IntegrationTestCase
 
     public function testSettingsAreForwarded(): void
     {
-        $client = $this->client();
-        $client->addSettings(['max_threads' => 3]);
+        $client = $this->client()->withSettings(['max_threads' => 3]);
         $this->assertSame([['v' => '3']], $client->getJsonData("SELECT toString(getSetting('max_threads')) AS v"));
     }
 
@@ -39,15 +39,15 @@ class ChcClientTest extends IntegrationTestCase
         $e = $this->caughtException(fn() => $client->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory"), ChcException::class);
         $this->assertSame(164, $e->getCode()); // READONLY
 
-        $this->assertTrue($client->readOnly(false));
+        $writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
         try {
-            $client->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory");
-            $client->execute("INSERT INTO $table VALUES (1), (2)");
-            $client->readOnly(true);
+            $writeClient->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory");
+            $e = $this->caughtException(fn() => $client->execute("INSERT INTO $table VALUES (1)"), ChcException::class);
+            $this->assertSame(164, $e->getCode()); // READONLY
+            $writeClient->execute("INSERT INTO $table VALUES (1), (2)");
             $this->assertSame([['c' => 2]], $client->getJsonData("SELECT toUInt8(count()) AS c FROM $table"));
         } finally {
-            $client->readOnly(false);
-            $client->execute("DROP TABLE IF EXISTS $table");
+            $writeClient->execute("DROP TABLE IF EXISTS $table");
         }
     }
 
@@ -60,16 +60,14 @@ class ChcClientTest extends IntegrationTestCase
 
     public function testMemoryLimitError(): void
     {
-        $client = $this->client();
-        $client->addSettings(['max_memory_usage' => 10000000]);
+        $client = $this->client()->withSettings(['max_memory_usage' => 10000000]);
         $e = $this->caughtException(fn() => $client->getJson('SELECT groupArray(number) FROM numbers(100000000)'), ChcMemoryLimitExceededException::class);
         $this->assertSame(241, $e->getCode());
     }
 
     public function testExceptionAfterHttp200IsDetected(): void
     {
-        $client = $this->client();
-        $client->addSettings(['max_block_size' => 1000]);
+        $client = $this->client()->withSettings(['max_block_size' => 1000]);
         $sql = "SELECT number, throwIf(number = 300000, 'boom') FROM numbers(400000)";
 
         $e = $this->caughtException(fn() => $client->getJson($sql), ChcException::class);

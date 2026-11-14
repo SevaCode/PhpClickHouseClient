@@ -24,13 +24,12 @@ abstract class IntegrationTestCase extends TestCase
 
     protected function client(): ChcClient
     {
-        $client = new ChcClient();
-        $client->setUrl($this->url());
+        $client = new ChcClient($this->url());
         if (getenv('CLICKHOUSE_USER')) {
-            $client->addSettings([
-                'user' => getenv('CLICKHOUSE_USER'),
-                'password' => (string)getenv('CLICKHOUSE_PASSWORD'),
-            ]);
+            $client = $client->withCredentials(
+                (string)getenv('CLICKHOUSE_USER'),
+                (string)getenv('CLICKHOUSE_PASSWORD'),
+            );
         }
         return $client;
     }

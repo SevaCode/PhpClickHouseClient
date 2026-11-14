@@ -7,12 +7,18 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 
 ### Removed
 - `HttpClient`, `Mode`, and `Transports\ChcHttpTransport`.
+- Mutable `ChcClient` setters and the `readOnly()` getter/setter.
+- `setReadOnlyOverPost()`; read queries now use POST by default.
 
 ### Changed
 - All requests use Symfony HttpClient with a shared default client.
 - PHP >= 8.3; `symfony/http-client` `^6.4 || ^7.0`.
 - Strict types and native parameter, return, and property types throughout PHP source and tests.
 - `ChcFormat` is a backed enum; format arguments accept `ChcFormat|string|null`.
+- `ChcClient` configuration uses immutable `withX()` methods; assign each returned client.
+- Non-ping queries use POST with SQL in the body and `Content-Type: text/plain; charset=UTF-8`;
+  the default read-only level is `2`, configurable with `withReadOnly(ChcReadOnly|int)`;
+  `ChcReadOnly` enum: `Disabled` (0), `Strict` (1), `AllowSettings` (2).
 
 ## [1.4]
 

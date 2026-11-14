@@ -75,19 +75,24 @@ class ChcSymfonyCurlTransportTest extends TestCase
     public function testForwardsMethodAndSettings(): void
     {
         $settings = ['database' => 'analytics', 'max_threads' => 2, 'user' => 'alice', 'password' => 'secret'];
-        foreach ([[true, 'GET'], [false, 'POST']] as [$readOnly, $method]) {
-            $client = new MockHttpClient(function ($actualMethod, $url, $options) use ($method) {
-                $this->assertSame($method, $actualMethod);
+        foreach ([[2, '2'], [0, null]] as [$readOnlyLevel, $expectedReadonly]) {
+            $client = new MockHttpClient(function ($actualMethod, $url, $options) use ($expectedReadonly) {
+                $this->assertSame('POST', $actualMethod);
                 parse_str((string)parse_url($url, PHP_URL_QUERY), $params);
                 $this->assertSame('analytics', $params['database'] ?? null);
                 $this->assertSame('2', $params['max_threads'] ?? null);
+                $this->assertSame($expectedReadonly, $params['readonly'] ?? null);
+                $this->assertArrayNotHasKey('query', $params);
+                $this->assertSame('query-context', $options['body']);
+                $headers = array_map('strtolower', $options['headers']);
+                $this->assertContains('content-type: text/plain; charset=utf-8', $headers);
                 $this->assertArrayNotHasKey('user', $params);
                 $this->assertArrayNotHasKey('password', $params);
                 $this->assertContains('X-ClickHouse-User: alice', $options['headers']);
                 $this->assertContains('X-ClickHouse-Key: secret', $options['headers']);
                 return new MockResponse();
             });
-            (new ChcSymfonyCurlTransport($client))->setReadOnly($readOnly)
+            (new ChcSymfonyCurlTransport($client))->setReadOnlyLevel($readOnlyLevel)
                 ->request($this->request()->setSettings($settings));
         }
     }
@@ -100,7 +105,7 @@ class ChcSymfonyCurlTransportTest extends TestCase
             $this->assertNull(parse_url($url, PHP_URL_QUERY));
             return new MockResponse("Ok.\n", ['http_code' => 200]);
         });
-        $transport = (new ChcSymfonyCurlTransport($client))->setReadOnly(false);
+        $transport = (new ChcSymfonyCurlTransport($client))->setReadOnlyLevel(0);
         $response = $transport->response($transport->request($this->request('', '')->setSettings(['database' => 'analytics'])));
         $this->assertSame("Ok.\n", $response->getResponse());
     }

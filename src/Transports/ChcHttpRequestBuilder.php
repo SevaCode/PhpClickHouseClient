@@ -16,8 +16,7 @@ final class ChcHttpRequestBuilder
 {
     public static function build(
         ChcRequest $request,
-        bool $readOnly,
-        bool $readOnlyOverPost = false,
+        int $readOnlyLevel,
         bool $compression = false,
     ): ChcHttpRequest {
         $values = $request->getSettings() ?? [];
@@ -52,28 +51,16 @@ final class ChcHttpRequestBuilder
             return new ChcHttpRequest('GET', 'ping', [], $headers, null, $cafile);
         }
 
-        $method = $readOnly ? 'GET' : 'POST';
-
-        // Opt-in: read-only запрос POST'ом с readonly=2 — то же, что сервер выставляет для GET
-        if ($readOnly && $readOnlyOverPost) {
-            $method = 'POST';
-            if (!isset($values['readonly'])) {
-                $values['readonly'] = 2;
-            }
+        if ($readOnlyLevel > 0 && !array_key_exists('readonly', $values)) {
+            $values['readonly'] = $readOnlyLevel;
         }
 
         if ($compression && !isset($values['enable_http_compression'])) {
             $values['enable_http_compression'] = 1;
         }
 
-        $body = null;
-        if ('POST' === $method) {
-            $headers['Content-type'] = 'application/x-www-form-urlencoded';
-            $body = $query;
-        } else {
-            $values['query'] = $query;
-        }
+        $headers['Content-Type'] = 'text/plain; charset=UTF-8';
 
-        return new ChcHttpRequest($method, '', $values, $headers, $body, $cafile);
+        return new ChcHttpRequest('POST', '', $values, $headers, $query, $cafile);
     }
 }
