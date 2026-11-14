@@ -82,11 +82,11 @@
 
 ## Релиз 1.4 и переход к 2.0
 
-- [ ] Смержить PR #1–#5, тег `1.4.0` (владелец).
-- [ ] Ветка `1.x` от `1.4.0` — только багфиксы; `master` → 2.0, branch-alias `2.0.x-dev`.
-- [x] [ADR-0002](../adr/0002-version-2.md): список ломающих изменений 2.0 (статус «предложено») ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
+- [x] Смержить PR #1–#5 (владелец).
+- [x] Ветка [`1.4`](https://github.com/SevaCode/PhpClickHouseClient/tree/1.4) — только багфиксы; `master` → 2.0, branch-alias `2.0.x-dev` ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
+- [x] [ADR-0002](../adr/0002-version-2.md): список ломающих изменений 2.0 (принято: 1–10, пункт 11 отклонён) ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
 - [x] Черновик [`UPGRADE-2.0.md`](../../UPGRADE-2.0.md) ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
-- [ ] `@deprecated` в 1.x для всего, что удаляется по принятым пунктам ADR-0002.
+- [ ] `@deprecated` в ветке `1.4` для всего, что удаляется по принятым пунктам ADR-0002.
 
 ## Этап 5. Версия 2.0 (нарушает обратную совместимость)
 
@@ -101,8 +101,8 @@
 - [ ] 7. `ping(): bool` без исключений.
 - [ ] 8. Иерархия исключений, `getCode()` = код ошибки ClickHouse.
 - [ ] 9. `pool()` с объектами результата вместо callback `getJsonPool()`.
-- [ ] 10. Минимум PHP 8.2 / Symfony 6.4.
-- [ ] 11. Переименование классов без префикса `Chc` (рекомендация — не делать).
+- [ ] 10. Минимум PHP 8.3 / Symfony 6.4.
+- ~~11. Переименование классов без префикса `Chc`~~ — отклонено, префикс остаётся.
 
 Без нарушения совместимости, в любой версии: комментарии на английском, PHP-CS-Fixer / PER-CS,
 повышение уровня PHPStan.
