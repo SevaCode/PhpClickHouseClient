@@ -73,6 +73,27 @@ $client->readOnly(false); // Deprecated: use withReadOnly(ChcReadOnly::Disabled)
 $client->write('INSERT INTO users VALUES ({id:UInt64}, {name:String})', ['id' => 43, 'name' => 'Ann']);
 ````
 
+### Typed parameters
+
+Named `ChcParam` factories render their own `{name:Type}` placeholder; the value is sent separately as
+`param_<name>`:
+
+````php
+$id = ChcParam::UInt64(42);
+$types = ChcParam::Array(['click', 'view'], ChcType::String(), 'types');
+$name = ChcParam::String(null, nullable: true);
+$rows = $client->fetchAll(
+    "SELECT * FROM events WHERE user_id = $id AND type IN $types AND isNull($name)",
+    [$id, $types, $name],
+);
+````
+
+The name is optional; omitted names are generated as `chc_N`. Pass a parameter in a list or under a
+matching string key. Use `nullable: true` for scalar factories or `ChcParam::Nullable($value, $type)`
+for a nullable composite parameter. An unused `ChcParam` throws before the request is sent. Use
+`ChcParam::of($value, $type)` and `ChcType::of()` for other types. `ChcType` is also `Stringable`,
+for example `CAST(x AS $type)`.
+
 The last argument of every method is per-query ClickHouse settings, e.g. `['max_execution_time' => 5]`.
 PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside arrays), `DateTimeInterface` →
 `Y-m-d H:i:s[.u]` (pass `'Y-m-d'` strings for `Date`), lists → `Array(...)`, string-keyed arrays → `Map(...)`.

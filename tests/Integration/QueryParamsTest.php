@@ -3,6 +3,8 @@
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
 use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\ChcParam;
+use SevaCode\ClickHouseClient\ChcType;
 
 class QueryParamsTest extends IntegrationTestCase
 {
@@ -58,6 +60,50 @@ class QueryParamsTest extends IntegrationTestCase
         $this->assertNull($client->fetchRow($sql, ['limit' => 0, 'in' => []]));
         $this->assertNull($client->fetchOne($sql, ['limit' => 0, 'in' => []]));
         $this->assertSame([], $client->fetchColumn($sql, ['limit' => 0, 'in' => []]));
+    }
+
+    public function testTypedParametersInFetchAndIterate(): void
+    {
+        $types = ChcParam::of(['click', 'view'], ChcType::Array(ChcType::String()), 'types');
+        $id = ChcParam::of(42, ChcType::UInt64());
+        $at = ChcParam::of(new \DateTimeImmutable('2024-01-02 03:04:05'), ChcType::DateTime(), 'at');
+        $nullable = ChcParam::of(null, ChcType::Nullable(ChcType::String()), 'nullable');
+
+        $sql = "SELECT has($types, {kind:String}) AS has_type, toString({$id}) AS id, {$at} AS at, isNull({$nullable}) AS is_null "
+            . "WHERE {kind:String} IN $types";
+        $this->assertSame([[
+            'has_type' => 1,
+            'id' => '42',
+            'at' => '2024-01-02 03:04:05',
+            'is_null' => 1,
+        ]], $this->client()->fetchAll($sql, [$types, $id, $at, $nullable, 'kind' => 'click']));
+
+        $iterated = iterator_to_array($this->client()->iterate("SELECT toString({$id}) AS id", [$id]));
+        $this->assertSame([['id' => '42']], $iterated);
+    }
+
+    public function testNamedFactoriesAgainstClickHouse(): void
+    {
+        $id = ChcParam::UInt64(42);
+        $nullable = ChcParam::String(null, nullable: true);
+        $types = ChcParam::Array(['click', 'view'], ChcType::String());
+        $map = ChcParam::Map(['a' => 1], ChcType::String(), ChcType::UInt64());
+        $at = ChcParam::DateTime64(new \DateTimeImmutable('2024-01-02 03:04:05.123'), 3, 'UTC');
+        $amount = ChcParam::Decimal('12.3400', 18, 4);
+
+        $sql = "SELECT toString($id) AS id, isNull($nullable) AS is_null, has($types, {kind:String}) AS has_click, "
+            . "toString({$map}['a']) AS mapped, toString($at) AS at, "
+            . "toDecimal64($amount, 4) = toDecimal64(12.34, 4) AS amount_matches "
+            . "WHERE {kind:String} IN $types";
+
+        $this->assertSame([[
+            'id' => '42',
+            'is_null' => 1,
+            'has_click' => 1,
+            'mapped' => '1',
+            'at' => '2024-01-02 03:04:05.123',
+            'amount_matches' => 1,
+        ]], $this->client()->fetchAll($sql, [$id, $nullable, $types, $map, $at, $amount, 'kind' => 'click']));
     }
 
     public function testPerQuerySettings(): void
