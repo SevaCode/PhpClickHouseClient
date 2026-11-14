@@ -3,6 +3,8 @@
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
 use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\ChcParam;
+use SevaCode\ClickHouseClient\ChcType;
 
 class QueryParamsTest extends IntegrationTestCase
 {
@@ -58,6 +60,26 @@ class QueryParamsTest extends IntegrationTestCase
         $this->assertNull($client->fetchRow($sql, ['limit' => 0, 'in' => []]));
         $this->assertNull($client->fetchOne($sql, ['limit' => 0, 'in' => []]));
         $this->assertSame([], $client->fetchColumn($sql, ['limit' => 0, 'in' => []]));
+    }
+
+    public function testTypedParametersInFetchAndIterate(): void
+    {
+        $types = ChcParam::of(['click', 'view'], ChcType::Array(ChcType::String()), 'types');
+        $id = ChcParam::of(42, ChcType::UInt64());
+        $at = ChcParam::of(new \DateTimeImmutable('2024-01-02 03:04:05'), ChcType::DateTime(), 'at');
+        $nullable = ChcParam::of(null, ChcType::Nullable(ChcType::String()), 'nullable');
+
+        $sql = "SELECT has($types, {kind:String}) AS has_type, toString({$id}) AS id, {$at} AS at, isNull({$nullable}) AS is_null "
+            . "WHERE {kind:String} IN $types";
+        $this->assertSame([[
+            'has_type' => 1,
+            'id' => '42',
+            'at' => '2024-01-02 03:04:05',
+            'is_null' => 1,
+        ]], $this->client()->fetchAll($sql, [$types, $id, $at, $nullable, 'kind' => 'click']));
+
+        $iterated = iterator_to_array($this->client()->iterate("SELECT toString({$id}) AS id", [$id]));
+        $this->assertSame([['id' => '42']], $iterated);
     }
 
     public function testPerQuerySettings(): void
