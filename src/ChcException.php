@@ -78,6 +78,7 @@ class ChcException extends \Exception
     /**
      * ClickHouse error code ('Code: N.' in the message), null — not a ClickHouse error.
      * getCode() keeps the old behaviour: ClickHouse error code if known, otherwise HTTP status.
+     * In 2.0 getCode() returns this value (0 if none); use getHttpStatus() for the HTTP status.
      */
     public function getClickHouseErrorCode(): ?int
     {

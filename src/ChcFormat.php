@@ -6,6 +6,9 @@
 
 namespace SevaCode\ClickHouseClient;
 
+/**
+ * In 2.0 becomes enum ChcFormat: string; use the constants (ChcFormat::JSON), not string literals.
+ */
 class ChcFormat
 {
     const TabSeparated = 'TabSeparated';

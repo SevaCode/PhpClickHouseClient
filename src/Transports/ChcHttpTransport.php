@@ -11,6 +11,9 @@ use SevaCode\ClickHouseClient\ChcRequest;
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
 use SevaCode\ClickHouseClient\Responses\ChcResponseFactory;
 
+/**
+ * @deprecated since 1.4, removed in 2.0: all requests go through Symfony HttpClient. ChcClient::setHttpClient() switches to it now.
+ */
 class ChcHttpTransport
 {
     /**

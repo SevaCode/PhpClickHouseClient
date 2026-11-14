@@ -3,7 +3,10 @@
 All notable changes. The project follows [Semantic Versioning](https://semver.org/);
 1.x keeps backward compatibility (see `docs/adr/0001-backward-compatibility.md`).
 
-## [Unreleased]
+## [1.4]
+
+### Deprecated
+- `HttpClient`, `Mode`, `Transports\ChcHttpTransport`, and `ChcClient::setReadOnlyOverPost()` are removed in 2.0; see ADR-0002.
 
 ### Added
 - Server-side query parameters (`{name:Type}` + `ChcParamEncoder`) and `fetchAll()`, `fetchRow()`,
