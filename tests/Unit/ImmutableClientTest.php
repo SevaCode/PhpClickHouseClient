@@ -3,6 +3,7 @@
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
 use SevaCode\ClickHouseClient\ChcClient;
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\Tests\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -125,13 +126,15 @@ class ImmutableClientTest extends TestCase
             new MockResponse('1'),
         ]);
 
-        $this->assertSame(2, $client->getReadOnly());
-        $levelOne = $client->withReadOnly(1);
+        $this->assertSame(ChcReadOnly::AllowSettings, $client->getReadOnly());
+        $levelOne = $client->withReadOnly(ChcReadOnly::Strict);
         $levelTwo = $client->withReadOnly(2);
-        $writeClient = $client->withReadOnly(0);
-        $this->assertSame(1, $levelOne->getReadOnly());
-        $this->assertSame(2, $levelTwo->getReadOnly());
-        $this->assertSame(0, $writeClient->getReadOnly());
+        $writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
+        $this->assertSame(ChcReadOnly::Strict, $levelOne->getReadOnly());
+        $this->assertSame(ChcReadOnly::Strict, $client->withReadOnly(1)->getReadOnly());
+        $this->assertSame(ChcReadOnly::AllowSettings, $levelTwo->getReadOnly());
+        $this->assertSame(ChcReadOnly::Disabled, $writeClient->getReadOnly());
+        $this->assertSame(ChcReadOnly::Disabled, $client->withReadOnly(0)->getReadOnly());
         $levelOne->getRaw('SELECT 1');
         $levelTwo->getRaw('SELECT 1');
         $writeClient->getRaw('SELECT 1');
@@ -145,7 +148,7 @@ class ImmutableClientTest extends TestCase
         $this->assertSame($requests[0], $requests[1]);
         parse_str((string)parse_url($levelOneUrl, PHP_URL_QUERY), $readQuery);
         $this->assertArrayNotHasKey('readonly', $readQuery);
-        $this->assertSame(2, $client->getReadOnly());
+        $this->assertSame(ChcReadOnly::AllowSettings, $client->getReadOnly());
         $this->assertSame('POST', $writeMethod);
         parse_str((string)parse_url($writeUrl, PHP_URL_QUERY), $writeQuery);
         $this->assertArrayNotHasKey('readonly', $writeQuery);
@@ -162,9 +165,9 @@ class ImmutableClientTest extends TestCase
         }
 
         $this->assertTrue($client->readOnly(false));
-        $this->assertSame(0, $client->getReadOnly());
+        $this->assertSame(ChcReadOnly::Disabled, $client->getReadOnly());
         $this->assertFalse($client->readOnly(true));
-        $this->assertSame(2, $client->getReadOnly());
+        $this->assertSame(ChcReadOnly::AllowSettings, $client->getReadOnly());
     }
 
     public function testConstructorSetsUrlAndUsesInjectedHttpClient(): void

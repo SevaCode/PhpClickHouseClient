@@ -13,6 +13,7 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 
 ### Added
 - Immutable `ChcClient::with*()` configuration methods, constructor `(url, httpClient)`, and `getReadOnly()`.
+- `ChcReadOnly` enum (`Disabled`, `Strict`, `AllowSettings`); `withReadOnly()` accepts it or an int 0–2.
 - Server-side query parameters (`{name:Type}` + `ChcParamEncoder`) and `fetchAll()`, `fetchRow()`,
   `fetchOne()`, `fetchColumn()`, `write()` with per-query settings.
 - `setCredentials()`, `setTimeout()`, opt-in `setReadOnlyOverPost()`.

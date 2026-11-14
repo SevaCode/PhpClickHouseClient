@@ -88,25 +88,26 @@ class ChcClient
     }
 
     /**
-     * Read-only level 0 allows writes; 1 and 2 use the existing read-only behavior in 1.4.
-     * Both 1 and 2 send GET requests, so ClickHouse applies the stricter profile level.
-     * In 2.0, level 1 sends readonly=1 over POST.
+     * ClickHouse `readonly` level: a ChcReadOnly case or its integer value 0–2.
+     * Disabled allows writes. In 1.4 Strict and AllowSettings both keep the existing GET reads,
+     * so ClickHouse applies the stricter profile level; in 2.0 Strict sends readonly=1 over POST.
      */
-    public function withReadOnly(int $level): static
+    public function withReadOnly(ChcReadOnly|int $level): static
     {
-        if (!in_array($level, [0, 1, 2], true)) {
-            throw new \InvalidArgumentException('Read-only level must be 0, 1 or 2');
+        if (is_int($level)) {
+            $level = ChcReadOnly::tryFrom($level)
+                ?? throw new \InvalidArgumentException('Read-only level must be 0, 1 or 2');
         }
 
         return $this->withClone(function (self $clone) use ($level) {
-            $clone->readOnly(0 !== $level);
-            $clone->readOnlyLevel = $level;
+            $clone->readOnly(ChcReadOnly::Disabled !== $level);
+            $clone->readOnlyLevel = $level->value;
         });
     }
 
-    public function getReadOnly(): int
+    public function getReadOnly(): ChcReadOnly
     {
-        return $this->isReadOnly ? $this->readOnlyLevel : 0;
+        return $this->isReadOnly ? ChcReadOnly::from($this->readOnlyLevel) : ChcReadOnly::Disabled;
     }
 
     public function withCompression(bool $enabled): static

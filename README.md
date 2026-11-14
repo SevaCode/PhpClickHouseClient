@@ -18,12 +18,21 @@ $client = (new ChcClient('http://localhost:8123/'))
     ->withSettings(['max_execution_time' => 5])
     ->withTimeout(10.0);
 
-$writeClient = $client->withReadOnly(0);
+$writeClient = $client->withReadOnly(ChcReadOnly::Disabled); // or withReadOnly(0)
 $writeClient->write('INSERT INTO events VALUES (1)');
 ````
 
-`withReadOnly(0)` allows writes. In 1.4, levels `1` and `2` both use the existing GET read behavior;
-in 2.0, level `1` sends `readonly=1` over POST. Use `getReadOnly()` to read the configured level.
+`withReadOnly()` takes a `ChcReadOnly` case or its integer value; `getReadOnly()` returns `ChcReadOnly`:
+
+| Level | `ChcReadOnly` | Meaning |
+|---|---|---|
+| 0 | `Disabled` | writes and DDL allowed |
+| 1 | `Strict` | reads only, settings cannot be changed; for users whose profile sets `readonly=1` |
+| 2 | `AllowSettings` | default: reads only, `SET`/`SETTINGS` allowed |
+
+In 1.4 `Strict` and `AllowSettings` both use the existing GET reads (ClickHouse keeps the stricter
+profile level); in 2.0 they send `readonly=1` / `readonly=2` over POST.
+See [ClickHouse query permissions](https://clickhouse.com/docs/operations/settings/permissions-for-queries).
 
 ````php
 $client = new ChcClient();
@@ -33,7 +42,7 @@ if (!$client->isAlive()) { // ping() throws ChcException when the server is unre
 }
 
 try {
-    $client->readOnly(true); // Deprecated in 1.4; use $client = $client->withReadOnly(2).
+    $client->readOnly(true); // Deprecated in 1.4; use $client = $client->withReadOnly(ChcReadOnly::AllowSettings).
     $result = $client->getRaw($query, ChcFormat::JSONEachRow);
 }
 catch (ChcException $e) {
@@ -60,7 +69,7 @@ $row   = $client->fetchRow('SELECT * FROM users WHERE id = {id:UInt64}', ['id' =
 $count = $client->fetchOne('SELECT count() FROM users WHERE name = {n:String}', ['n' => "O'Reilly"]);
 $ids   = $client->fetchColumn('SELECT id FROM users LIMIT {n:UInt8}', ['n' => 10]);
 
-$client->readOnly(false); // Deprecated: use withReadOnly(0).
+$client->readOnly(false); // Deprecated: use withReadOnly(ChcReadOnly::Disabled).
 $client->write('INSERT INTO users VALUES ({id:UInt64}, {name:String})', ['id' => 43, 'name' => 'Ann']);
 ````
 
@@ -81,7 +90,7 @@ foreach ($client->iterate('SELECT * FROM hits WHERE dt = {dt:Date}', ['dt' => '2
 }
 
 // Streaming insert from an array or a generator; list rows are matched to $columns
-$client->readOnly(false); // Deprecated: use withReadOnly(0).
+$client->readOnly(false); // Deprecated: use withReadOnly(ChcReadOnly::Disabled).
 $client->insert('db.events', $rowsGenerator);
 $client->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
 
