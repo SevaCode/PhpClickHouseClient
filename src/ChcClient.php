@@ -574,16 +574,60 @@ class ChcClient
     }
 
     /**
+     * Sends all queries to ClickHouse in parallel (FORMAT JSON). The returned array is keyed
+     * and ordered by the original $queries keys. At most setPoolConcurrency()/withPoolConcurrency()
+     * requests are in flight; the first failure throws and cancels the remaining requests.
+     *
+     *     $results = $client->pool(['a' => 'SELECT 1 AS n', 'b' => 'SELECT 2 AS n']);
+     *     $results['a']->data[0]['n']; // 1
+     *
+     * @template K of array-key
+     * @param array<K, string> $queries
+     * @return array<K, ChcResult>
+     * @throws ChcException
+     */
+    public function pool(array $queries): array
+    {
+        return iterator_to_array($this->poolResults($queries));
+    }
+
+    /**
+     * @deprecated since 1.4, use pool(); kept in 2.0 as a deprecated wrapper, removed in 3.0
+     *
      * Sends all queries to ClickHouse in parallel and passes each JSON response
      * through $callback. The returned array is keyed by the original $queries keys.
-     *
-     * In 2.0 replaced by pool() returning result objects.
      *
      * @param array<string> $queries
      * @param callable(array $data, array $meta, int $rows, ?int $rows_before_limit_at_least, ?array $statistics, ?array $totals, mixed $extremes, float $start_time): mixed $callback
      * @return array
      */
     public function getJsonPool(array $queries, callable $callback): array
+    {
+        $result = [];
+        foreach ($this->poolResults($queries) as $key => $r) {
+            $result[$key] = $callback(
+                $r->data,
+                $r->meta,
+                $r->rows,
+                $r->rowsBeforeLimitAtLeast,
+                $r->statistics,
+                $r->totals,
+                $r->extremes,
+                $r->startTime,
+            );
+        }
+        return $result;
+    }
+
+    /**
+     * Yields results in $queries order as they arrive, so getJsonPool() callbacks keep running
+     * one by one while later requests are still in flight.
+     *
+     * @template K of array-key
+     * @param array<K, string> $queries
+     * @return \Generator<K, ChcResult>
+     */
+    private function poolResults(array $queries): \Generator
     {
         $formatPostfix = $this->getQueryFormatPostfix(ChcFormat::JSON);
         $transport = $this->symfonyTransport();
@@ -613,13 +657,11 @@ class ChcClient
                 $start($i);
             }
 
-            // Callbacks run in $queries order; at most $concurrency requests are in flight
-            $result = [];
             foreach ($keys as $i => $key) {
                 $response = $responses[$i];
                 unset($responses[$i]);
                 try {
-                    $jsonResponse = $transport->response($response)->getResponse();
+                    $chcResponse = $transport->response($response);
                 } catch (TransportExceptionInterface $e) {
                     throw ChcException::create(
                         message: $e->getMessage(),
@@ -628,16 +670,20 @@ class ChcClient
                         query: $response->getQuery(),
                     );
                 }
+                $json = $chcResponse->getResponse();
                 $start($i + $concurrency);
-                $result[$key] = $callback(
-                    $jsonResponse['data'],
-                    $jsonResponse['meta'],
-                    $jsonResponse['rows'],
-                    $jsonResponse['rows_before_limit_at_least'] ?? null,
-                    $jsonResponse['statistics'] ?? null,
-                    $jsonResponse['totals'] ?? null,
-                    $jsonResponse['extremes'] ?? null,
-                    $response->getInfo('start_time'),
+                $headerLines = $chcResponse->getHeaderLines();
+                yield $key => new ChcResult(
+                    data: $json['data'],
+                    meta: $json['meta'],
+                    rows: $json['rows'],
+                    rowsBeforeLimitAtLeast: $json['rows_before_limit_at_least'] ?? null,
+                    statistics: $json['statistics'] ?? null,
+                    totals: $json['totals'] ?? null,
+                    extremes: $json['extremes'] ?? null,
+                    startTime: (float)$response->getInfo('start_time'),
+                    queryId: ChcHeaders::queryId($headerLines),
+                    summary: ChcHeaders::summary($headerLines),
                 );
             }
         } finally {
@@ -646,8 +692,6 @@ class ChcClient
             }
             $this->last_query_latency = microtime(true) - $timeStart;
         }
-
-        return $result;
     }
 
     /**
