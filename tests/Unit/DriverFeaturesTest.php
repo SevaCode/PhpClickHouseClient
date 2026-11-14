@@ -133,6 +133,20 @@ class DriverFeaturesTest extends TestCase
         $this->assertFalse($this->client($requests, [new MockResponse('', ['http_code' => 503])])->isAlive());
     }
 
+    public function testDefaultHttpClientIsAliveReturnsFalseWhenConnectionFails(): void
+    {
+        $client = new ChcClient();
+        $client->setUrl('http://127.0.0.1:1/');
+        $this->assertFalse(@$client->isAlive());
+    }
+
+    public function testDefaultHttpClientConnectionFailureThrowsChcConnectionException(): void
+    {
+        $client = new ChcClient();
+        $client->setUrl('http://127.0.0.1:1/');
+        $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcConnectionException::class);
+    }
+
     public function testDefaultHttpClientIsReusedAndResetWhenUrlChanges(): void
     {
         $client = new class extends ChcClient {
