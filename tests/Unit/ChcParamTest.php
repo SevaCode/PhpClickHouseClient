@@ -14,6 +14,81 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 class ChcParamTest extends TestCase
 {
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function scalarFactories(): iterable
+    {
+        foreach ([
+            'Int8', 'Int16', 'Int32', 'Int64', 'Int128', 'Int256',
+            'UInt8', 'UInt16', 'UInt32', 'UInt64', 'UInt128', 'UInt256',
+            'Float32', 'Float64', 'Bool', 'String', 'UUID', 'Date', 'Date32', 'IPv4', 'IPv6',
+        ] as $factory) {
+            yield $factory => [$factory, $factory];
+        }
+    }
+
+    /**
+     * @dataProvider scalarFactories
+     */
+    public function testScalarFactories(string $factory, string $type): void
+    {
+        $param = call_user_func([ChcParam::class, $factory], 1, 'n');
+        $this->assertInstanceOf(ChcParam::class, $param);
+        $this->assertSame('{n:' . $type . '}', (string)$param);
+
+        $nullable = call_user_func([ChcParam::class, $factory], 1, 'n', true);
+        $this->assertInstanceOf(ChcParam::class, $nullable);
+        $this->assertSame('{n:Nullable(' . $type . ')}', (string)$nullable);
+    }
+
+    public function testNullableAndParameterizedFactories(): void
+    {
+        try {
+            ChcParam::String(null);
+            $this->fail('Expected null with a non-nullable type to be rejected');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertSame(
+                'Query parameter value is null but the type is not Nullable; use nullable: true or ChcParam::Nullable()',
+                $e->getMessage(),
+            );
+        }
+
+        $string = ChcParam::String(null, nullable: true);
+        $nullable = ChcParam::Nullable(null, ChcType::String());
+        $this->assertSame('{' . $string->name . ':Nullable(String)}', (string)$string);
+        $this->assertSame('{' . $nullable->name . ':Nullable(String)}', (string)$nullable);
+        $this->assertSame('\N', ChcParamEncoder::toHttpParams([$string])['param_' . $string->name]);
+        $this->assertSame('\N', ChcParamEncoder::toHttpParams([$nullable])['param_' . $nullable->name]);
+
+        $dateTime = ChcParam::DateTime(new \DateTimeImmutable('2024-01-02 03:04:05'), 'UTC', 'at');
+        $dateTime64 = ChcParam::DateTime64(new \DateTimeImmutable('2024-01-02 03:04:05.123'), 3, 'UTC', 'at64');
+        $decimal = ChcParam::Decimal('12.3400', 18, 4, 'amount');
+        $fixedString = ChcParam::FixedString('abc', 16, 'fixed');
+
+        $this->assertSame("{at:DateTime('UTC')}", (string)$dateTime);
+        $this->assertSame("{at64:DateTime64(3, 'UTC')}", (string)$dateTime64);
+        $this->assertSame('{amount:Decimal(18, 4)}', (string)$decimal);
+        $this->assertSame('{fixed:FixedString(16)}', (string)$fixedString);
+    }
+
+    public function testCompositeFactoriesRenderAndEncodeTheirTypes(): void
+    {
+        $array = ChcParam::Array(['click', 'view'], ChcType::String(), 'types');
+        $lowCardinality = ChcParam::LowCardinality('click', ChcType::String(), 'kind');
+        $map = ChcParam::Map(['a' => 1], ChcType::String(), ChcType::UInt64(), 'mapping');
+
+        $this->assertSame('{types:Array(String)}', (string)$array);
+        $this->assertSame('{kind:LowCardinality(String)}', (string)$lowCardinality);
+        $this->assertSame('{mapping:Map(String, UInt64)}', (string)$map);
+        $this->assertSame("['click','view']", ChcParamEncoder::toHttpParams([$array])['param_types']);
+        $this->assertSame('click', ChcParamEncoder::toHttpParams([$lowCardinality])['param_kind']);
+        $this->assertSame("{'a':1}", ChcParamEncoder::toHttpParams([$map])['param_mapping']);
+
+        $auto = ChcParam::UInt64(42);
+        $this->assertMatchesRegularExpression('/^\{chc_[1-9][0-9]*:UInt64}$/', (string)$auto);
+    }
+
     public function testNamedAndAutoNamedPlaceholders(): void
     {
         $named = ChcParam::of(['click', 'view'], ChcType::Array(ChcType::String()), 'types');

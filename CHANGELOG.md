@@ -6,8 +6,8 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 ## [Unreleased]
 
 ### Added
-- Typed query parameters with `ChcType` and `ChcParam`, including list parameters and validation for
-  unused typed parameters.
+- Typed query parameters with `ChcType`, `ChcParam::of()`, named `ChcParam` factories, list parameters,
+  and validation for unused typed parameters.
 
 ## [2.0.0] — 2026-11-14
 

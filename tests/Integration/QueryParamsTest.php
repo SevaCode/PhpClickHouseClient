@@ -85,6 +85,30 @@ class QueryParamsTest extends IntegrationTestCase
         $this->assertSame([['id' => '42']], $iterated);
     }
 
+    public function testNamedFactoriesAgainstClickHouse(): void
+    {
+        $id = ChcParam::UInt64(42);
+        $nullable = ChcParam::String(null, nullable: true);
+        $types = ChcParam::Array(['click', 'view'], ChcType::String());
+        $map = ChcParam::Map(['a' => 1], ChcType::String(), ChcType::UInt64());
+        $at = ChcParam::DateTime64(new \DateTimeImmutable('2024-01-02 03:04:05.123'), 3, 'UTC');
+        $amount = ChcParam::Decimal('12.3400', 18, 4);
+
+        $sql = "SELECT toString($id) AS id, isNull($nullable) AS is_null, has($types, {kind:String}) AS has_click, "
+            . "toString({$map}['a']) AS mapped, toString($at) AS at, "
+            . "toDecimal64($amount, 4) = toDecimal64(12.34, 4) AS amount_matches "
+            . "WHERE {kind:String} IN $types";
+
+        $this->assertSame([[
+            'id' => '42',
+            'is_null' => 1,
+            'has_click' => 1,
+            'mapped' => '1',
+            'at' => '2024-01-02 03:04:05.123',
+            'amount_matches' => 1,
+        ]], $this->client()->fetchAll($sql, [$id, $nullable, $types, $map, $at, $amount, 'kind' => 'click']));
+    }
+
     public function testPerQuerySettings(): void
     {
         $client = $this->client();
