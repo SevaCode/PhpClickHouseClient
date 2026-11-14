@@ -92,8 +92,8 @@
 
 Реализуются только пункты, принятые в [ADR-0002](../adr/0002-version-2.md). Номера соответствуют таблице ADR.
 
-- [ ] 1. Удалить устаревшие `HttpClient` и `Mode`.
-- [ ] 2. Единственный транспорт на Symfony HttpClient, удалить `ChcHttpTransport`.
+- [x] 1. Удалить устаревшие `HttpClient` и `Mode` ([PR #8](https://github.com/sevacode/phpclickhouseclient/pull/8)).
+- [x] 2. Единственный транспорт на Symfony HttpClient, удалить `ChcHttpTransport` ([PR #8](https://github.com/sevacode/phpclickhouseclient/pull/8)).
 - [ ] 3. `declare(strict_types=1)`, строгие типы в сигнатурах и свойствах.
 - [ ] 4. `ChcFormat` → `enum`.
 - [ ] 5. Иммутабельный клиент (`with*()`).
@@ -101,7 +101,7 @@
 - [ ] 7. `ping(): bool` без исключений.
 - [ ] 8. Иерархия исключений, `getCode()` = код ошибки ClickHouse.
 - [ ] 9. `pool()` с объектами результата вместо callback `getJsonPool()`.
-- [ ] 10. Минимум PHP 8.3 / Symfony 6.4.
+- [x] 10. Минимум PHP 8.3 / Symfony 6.4 ([PR #8](https://github.com/sevacode/phpclickhouseclient/pull/8)).
 - ~~11. Переименование классов без префикса `Chc`~~ — отклонено, префикс остаётся.
 
 Без нарушения совместимости, в любой версии: комментарии на английском, PHP-CS-Fixer / PER-CS,

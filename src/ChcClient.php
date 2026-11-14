@@ -10,7 +10,6 @@ use Psr\Log\LoggerInterface;
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
 use SevaCode\ClickHouseClient\Responses\ChcResponse;
 use SevaCode\ClickHouseClient\Transports\ChcHeaders;
-use SevaCode\ClickHouseClient\Transports\ChcHttpTransport;
 use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;
 use SevaCode\ClickHouseClient\Transports\ExtendedSymfonyHttpResponse;
 use Symfony\Component\HttpClient\HttpClient as SymfonyHttpClient;
@@ -39,6 +38,7 @@ class ChcClient
     private bool $readOnlyOverPost = false;
     private bool $compression = false;
     private ?HttpClientInterface $httpClient = null;
+    private ?HttpClientInterface $defaultHttpClient = null;
     private ?int $poolConcurrency = null;
     private int $retries = 0;
     private float $retryDelay = 0.0;
@@ -104,8 +104,8 @@ class ChcClient
 
     /**
      * Route all requests through this Symfony HTTP client (connection reuse / keep-alive,
-     * proxies, custom TLS, retries, test doubles). Without it, regular queries use the
-     * built-in stream transport as before. The client's base_uri is set to the client URL.
+     * proxies, custom TLS, retries, test doubles). The default is a shared HttpClient::create()
+     * client. The client's base_uri is set to the client URL.
      */
     public function setHttpClient(?HttpClientInterface $httpClient): void
     {
@@ -195,6 +195,7 @@ class ChcClient
     public function setUrl($url)
     {
         $this->url = $url;
+        $this->defaultHttpClient = null;
     }
 
     /**
@@ -236,28 +237,14 @@ class ChcClient
 
     private function sendRequest(ChcRequest $request): ChcResponse
     {
-        if (null !== $this->httpClient) {
-            $transport = $this->symfonyTransport();
-            $timeStart = microtime(true);
-            try {
-                return $transport->response($transport->request($request));
-            } catch (TransportExceptionInterface $e) {
-                throw ChcException::create(message: $e->getMessage(), previous: $e, query: $request->getQuery());
-            } finally {
-                $this->last_query_latency = microtime(true) - $timeStart;
-            }
-        }
-
-        $transport = (new ChcHttpTransport($this->url))
-            ->setReadOnly($this->isReadOnly)
-            ->setReadOnlyOverPost($this->readOnlyOverPost)
-            ->setCompression($this->compression)
-            ->setTimeout($this->timeout);
-
+        $transport = $this->symfonyTransport();
+        $timeStart = microtime(true);
         try {
-            return $transport->run($request);
+            return $transport->response($transport->request($request));
+        } catch (TransportExceptionInterface $e) {
+            throw ChcException::create(message: $e->getMessage(), previous: $e, query: $request->getQuery());
         } finally {
-            $this->last_query_latency = $transport->getLastQueryLatency();
+            $this->last_query_latency = microtime(true) - $timeStart;
         }
     }
 
@@ -612,7 +599,7 @@ class ChcClient
 
     private function symfonyTransport(): ChcSymfonyCurlTransport
     {
-        $transport = (new ChcSymfonyCurlTransport($this->httpClient ?? $this->createHttpClient()))
+        $transport = (new ChcSymfonyCurlTransport($this->httpClient ?? ($this->defaultHttpClient ??= $this->createHttpClient())))
             ->setReadOnly($this->isReadOnly)
             ->setReadOnlyOverPost($this->readOnlyOverPost)
             ->setCompression($this->compression)
@@ -624,7 +611,7 @@ class ChcClient
     }
 
     /**
-     * HTTP client for concurrent requests (getJsonPool).
+     * Default HTTP client for all requests.
      */
     protected function createHttpClient(): HttpClientInterface
     {

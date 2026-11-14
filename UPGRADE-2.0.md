@@ -16,4 +16,31 @@
 
 ## Breaking changes
 
-_To be filled in per accepted ADR-0002 item._
+### HttpClient and Mode removed (ADR-0002 #1)
+
+Use `ChcClient` instead of the `HttpClient` wrapper. `Mode::READONLY` and `Mode::WRITE` are replaced
+by the boolean `readOnly()` API:
+
+```php
+$client = new ChcClient();
+$client->readOnly(false); // replaces setMode(Mode::WRITE)
+```
+
+- `getMode()` → `$client->readOnly()`; `setMode(Mode::READONLY|Mode::WRITE)` → `$client->readOnly(true|false)`.
+- `getData($query)` → `$client->getJsonData($query)`.
+- `query($query)` → `$client->getRaw($query, $format)` for reads or
+  `$client->execute($query, $format)->getBody()` for writes.
+- `setFormat()` / `getFormat()` → pass the format to `getRaw()` or `execute()` for each query.
+- `getUrl()` has no direct replacement; keep the URL in application configuration if needed.
+
+### Native transport removed (ADR-0002 #2)
+
+All requests go through Symfony HttpClient, which is already a dependency. The default is a shared
+`HttpClient::create()` client with keep-alive. Inject a configured client with `setHttpClient()`.
+Code that instantiated `Transports\ChcHttpTransport` should use `ChcClient` instead.
+
+### PHP 8.3+ and symfony/http-client ^6.4 || ^7.0 (ADR-0002 #10)
+
+PHP 8.3 or newer is required, with `symfony/http-client` version `^6.4 || ^7.0`.
+
+_Other accepted ADR-0002 items are added as they are implemented._

@@ -3,7 +3,16 @@
 All notable changes. The project follows [Semantic Versioning](https://semver.org/);
 1.x keeps backward compatibility (see `docs/adr/0001-backward-compatibility.md`).
 
-## [Unreleased]
+## [Unreleased] — 2.0
+
+### Removed
+- `HttpClient`, `Mode`, and `Transports\ChcHttpTransport`.
+
+### Changed
+- All requests use Symfony HttpClient with a shared default client.
+- PHP >= 8.3; `symfony/http-client` `^6.4 || ^7.0`.
+
+## [1.4]
 
 ### Added
 - Server-side query parameters (`{name:Type}` + `ChcParamEncoder`) and `fetchAll()`, `fetchRow()`,

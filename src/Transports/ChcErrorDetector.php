@@ -39,7 +39,19 @@ class ChcErrorDetector
      */
     public static function throwIfError(string $body, int $httpStatus, array $headerLines, ?string $query): void
     {
+        $tag = self::exceptionTag($headerLines);
+        if (null !== $tag && ($exception = self::detectTagged($body, $tag, $httpStatus, $query))) {
+            throw $exception;
+        }
+
         if (200 !== $httpStatus) {
+            // On non-200 ClickHouse writes the error as plain text 'Code: N. DB::Exception: …',
+            // possibly glued to partially written output. X-ClickHouse-Format / Content-Type
+            // still describe the requested format (e.g. JSON), so checksFor() can't be used here.
+            if ($exception = self::detect($body, $httpStatus, ['plain'], $query)) {
+                throw $exception;
+            }
+
             $statusLine = self::statusLine($headerLines);
             if (empty($body)) {
                 $body = 'Unexpected response status: ' . ($statusLine ?: (string)$httpStatus);
@@ -49,11 +61,6 @@ class ChcErrorDetector
                 code: $httpStatus,
                 query: $query,
             );
-        }
-
-        $tag = self::exceptionTag($headerLines);
-        if (null !== $tag && ($exception = self::detectTagged($body, $tag, $httpStatus, $query))) {
-            throw $exception;
         }
 
         if ($exception = self::detect($body, $httpStatus, self::checksFor($headerLines), $query)) {

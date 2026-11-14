@@ -18,12 +18,15 @@ class ChcSymfonyCurlTransportTest extends TestCase
     {
         $memoryBody = '{"data":[{"x":1}]' . "\nCode: 241. DB::Exception: query failed";
         $timeoutBody = '{"data":[{"x":1}]' . "\nCode: 159. DB::Exception: query failed";
+        $serverErrorMessage = 'Code: 395. DB::Exception: boom (FUNCTION_THROW_IF_VALUE_IS_NON_ZERO) (version 26.10.3.7 (official build))';
+        $serverErrorBody = '{"data":[{"x":1}]}' . $serverErrorMessage;
         $cases = [
             ['partial {', 200, ChcException::class, 'partial {', 200],
             ['0', 200, ChcException::class, '0', 200],
             ['', 200, ChcException::class, 'Empty response body', 200],
             [$memoryBody, 200, ChcMemoryLimitExceededException::class, $memoryBody, 241],
             [$timeoutBody, 200, ChcTimeoutExceededException::class, $timeoutBody, 159],
+            [$serverErrorBody, 500, ChcException::class, $serverErrorMessage, 395],
             ['Code: 60. DB::Exception: Unknown table', 500, ChcException::class, 'Code: 60. DB::Exception: Unknown table', 60],
             ["1\t2\nCode: 395. DB::Exception: boom (FOO) (version 1.0 (official build))", 200, ChcException::class, 'Code: 395. DB::Exception: boom (FOO) (version 1.0 (official build))', 395],
             ['Proxy error', 502, ChcException::class, 'Proxy error', 502],
@@ -33,6 +36,7 @@ class ChcSymfonyCurlTransportTest extends TestCase
             $e = $this->caughtException(fn() => $this->response($body, $status)->getResponse(), $class);
             $this->assertSame($message, $e->getMessage());
             $this->assertSame($code, $e->getCode());
+            $this->assertSame($status, $e->getHttpStatus());
             $this->assertSame('query-context', $e->getQuery());
         }
     }
