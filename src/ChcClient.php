@@ -346,10 +346,11 @@ class ChcClient
      *     $client->fetchAll('SELECT * FROM t WHERE id = {id:UInt64} AND tag IN {tags:Array(String)}',
      *         ['id' => 5, 'tags' => ['a', 'b']]);
      *
-     * @param array<string, mixed> $params values for {name:Type} placeholders
+     * @param array<array-key, mixed> $params values for {name:Type} placeholders and/or ChcParam objects
      * @param array<string, mixed> $settings ClickHouse settings for this query only
      * @return array<int, array<string, mixed>>
      * @throws ChcException
+     * @throws \InvalidArgumentException when a typed parameter is unused or invalid
      */
     public function fetchAll(string $sql, array $params = [], array $settings = []): array
     {
@@ -359,10 +360,11 @@ class ChcClient
     /**
      * First row or null.
      *
-     * @param array<string, mixed> $params
+     * @param array<array-key, mixed> $params values for {name:Type} placeholders and/or ChcParam objects
      * @param array<string, mixed> $settings
      * @return array<string, mixed>|null
      * @throws ChcException
+     * @throws \InvalidArgumentException when a typed parameter is unused or invalid
      */
     public function fetchRow(string $sql, array $params = [], array $settings = []): ?array
     {
@@ -372,9 +374,10 @@ class ChcClient
     /**
      * First column of the first row or null.
      *
-     * @param array<string, mixed> $params
+     * @param array<array-key, mixed> $params values for {name:Type} placeholders and/or ChcParam objects
      * @param array<string, mixed> $settings
      * @throws ChcException
+     * @throws \InvalidArgumentException when a typed parameter is unused or invalid
      */
     public function fetchOne(string $sql, array $params = [], array $settings = []): mixed
     {
@@ -385,10 +388,11 @@ class ChcClient
     /**
      * First column of every row.
      *
-     * @param array<string, mixed> $params
+     * @param array<array-key, mixed> $params values for {name:Type} placeholders and/or ChcParam objects
      * @param array<string, mixed> $settings
      * @return array<int, mixed>
      * @throws ChcException
+     * @throws \InvalidArgumentException when a typed parameter is unused or invalid
      */
     public function fetchColumn(string $sql, array $params = [], array $settings = []): array
     {
@@ -402,9 +406,10 @@ class ChcClient
      * DDL/DML (CREATE, INSERT ... VALUES, ALTER ...) with query parameters.
      * Honours read-only mode: use withReadOnly(ChcReadOnly::Disabled) to allow writes.
      *
-     * @param array<string, mixed> $params
+     * @param array<array-key, mixed> $params values for {name:Type} placeholders and/or ChcParam objects
      * @param array<string, mixed> $settings
      * @throws ChcException
+     * @throws \InvalidArgumentException when a typed parameter is unused or invalid
      */
     public function write(string $sql, array $params = [], array $settings = []): ChcResponse
     {
@@ -412,7 +417,7 @@ class ChcClient
     }
 
     /**
-     * @param array<string, mixed> $params
+     * @param array<array-key, mixed> $params values for {name:Type} placeholders and/or ChcParam objects
      * @param array<string, mixed> $settings
      * @return array<string, mixed>
      */
@@ -423,7 +428,7 @@ class ChcClient
     }
 
     /**
-     * @param array<string, mixed> $params
+     * @param array<array-key, mixed> $params
      * @param array<string, mixed> $settings
      */
     private function makeParamRequest(string $sql, array $params, array $settings, ?string $format): ChcRequest
@@ -431,7 +436,7 @@ class ChcClient
         $this->logSql($sql);
 
         return (new ChcRequest)
-            ->setSettings(array_merge($this->settings, $settings, ChcParamEncoder::toHttpParams($params)))
+            ->setSettings(array_merge($this->settings, $settings, ChcParamEncoder::toHttpParams($params, $sql)))
             ->setQuery($sql)
             ->setReturnFormat($format);
     }
@@ -564,10 +569,11 @@ class ChcClient
      * Errors sent by the server in the middle of the stream are thrown as ChcException
      * after the rows received before the error.
      *
-     * @param array<string, mixed> $params
+     * @param array<array-key, mixed> $params values for {name:Type} placeholders and/or ChcParam objects
      * @param array<string, mixed> $settings
      * @return \Generator<int, array<string, mixed>>
      * @throws ChcException
+     * @throws \InvalidArgumentException when a typed parameter is unused or invalid
      */
     public function iterate(string $sql, array $params = [], array $settings = []): \Generator
     {

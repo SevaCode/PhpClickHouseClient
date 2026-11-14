@@ -19,20 +19,43 @@ final class ChcParamEncoder
     private const NAME_PATTERN = '/^[a-zA-Z_][a-zA-Z0-9_]*$/';
 
     /**
-     * @param array<string, mixed> $params ['id' => 5, 'names' => ['a', 'b']]
+     * @param array<array-key, mixed> $params ['id' => 5, 'names' => ['a', 'b']]
      * @return array<string, string> ['param_id' => '5', 'param_names' => "['a','b']"]
-     * @throws \InvalidArgumentException on invalid parameter name or unsupported value
+     * @throws \InvalidArgumentException on an invalid name, unused typed parameter, duplicate name, or unsupported value
      */
-    public static function toHttpParams(array $params): array
+    public static function toHttpParams(array $params, ?string $sql = null): array
     {
         $result = [];
-        foreach ($params as $name => $value) {
-            if (!is_string($name) || !preg_match(self::NAME_PATTERN, $name)) {
-                throw new \InvalidArgumentException('Invalid query parameter name: ' . var_export($name, true));
+        $names = [];
+        foreach ($params as $key => $value) {
+            if ($value instanceof ChcParam) {
+                $name = $value->name;
+                if (is_string($key) && $key !== $name) {
+                    throw new \InvalidArgumentException("Query parameter key '$key' does not match ChcParam name '$name'");
+                }
+                if (null !== $sql && !str_contains($sql, (string)$value)) {
+                    throw new \InvalidArgumentException('Query parameter ' . $value . ' is not used in the query');
+                }
+                $value = $value->value;
+            } else {
+                if (!is_string($key) || !self::isValidParameterName($key)) {
+                    throw new \InvalidArgumentException('Invalid query parameter name: ' . var_export($key, true));
+                }
+                $name = $key;
             }
+
+            if (isset($names[$name])) {
+                throw new \InvalidArgumentException('Duplicate query parameter: ' . $name);
+            }
+            $names[$name] = true;
             $result['param_' . $name] = self::encode($value);
         }
         return $result;
+    }
+
+    public static function isValidParameterName(string $name): bool
+    {
+        return 1 === preg_match(self::NAME_PATTERN, $name);
     }
 
     /**
@@ -40,6 +63,8 @@ final class ChcParamEncoder
      */
     public static function encode(mixed $value): string
     {
+        self::rejectTypedParameterValue($value);
+
         return match (true) {
             null === $value => '\N',
             is_bool($value) => $value ? '1' : '0',
@@ -56,6 +81,8 @@ final class ChcParamEncoder
      */
     private static function literal(mixed $value): string
     {
+        self::rejectTypedParameterValue($value);
+
         if (null === $value) {
             return 'NULL';
         }
@@ -92,6 +119,13 @@ final class ChcParamEncoder
         }
 
         throw new \InvalidArgumentException('Unsupported query parameter type: ' . get_debug_type($value));
+    }
+
+    private static function rejectTypedParameterValue(mixed $value): void
+    {
+        if ($value instanceof ChcParam || $value instanceof ChcType) {
+            throw new \InvalidArgumentException('ChcParam cannot be nested in query parameter values');
+        }
     }
 
     private static function float(float $value): string
