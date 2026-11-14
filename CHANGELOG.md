@@ -23,6 +23,9 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 - Exceptions distinguish ClickHouse server errors, connection failures/client timeouts, and HTTP
   errors without a ClickHouse code. `getCode()` returns the ClickHouse code or `0`; use
   `getHttpStatus()` for the HTTP status. `ChcTimeoutExceededException` represents server error 159.
+- `pool(array $queries): array<key, ChcResult>` replaces callback-based `getJsonPool()`; `ChcResult`
+  exposes `data`, `meta`, `rows`, `rowsBeforeLimitAtLeast`, `statistics`, `totals`, `extremes`,
+  `startTime`, `queryId` and `summary`. `getJsonPool()` is deprecated (removal in 3.0).
 
 ## [1.4]
 

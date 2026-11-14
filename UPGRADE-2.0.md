@@ -119,4 +119,19 @@ for the response status and `getClickHouseErrorCode()` when you need a nullable 
 Client-side timeouts are `ChcClientTimeoutException`, not `ChcTimeoutExceededException`; the latter
 represents server-side error 159. A `catch (ChcException)` still catches every client exception.
 
-_Other accepted ADR-0002 items are added as they are implemented._
+### pool() returns result objects (ADR-0002 #9)
+
+`pool(array $queries): array<key, ChcResult>` replaces the callback with eight positional arguments:
+
+```php
+// 1.x
+$counts = $client->getJsonPool($queries, fn($data, $meta, $rows) => $rows);
+// 2.0
+$counts = array_map(fn(ChcResult $r) => $r->rows, $client->pool($queries));
+```
+
+`ChcResult` has `data`, `meta`, `rows`, `rowsBeforeLimitAtLeast`, `statistics`, `totals`, `extremes`,
+`startTime`, plus `queryId` and `summary` from the response headers. Keys, order, concurrency
+(`withPoolConcurrency()`) and errors are the same as in `getJsonPool()`. `pool()` keeps every result
+in memory until it returns; `getJsonPool()` still runs the callback per response, is deprecated and
+will be removed in 3.0.
