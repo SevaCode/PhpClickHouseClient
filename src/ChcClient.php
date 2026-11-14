@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace SevaCode\ClickHouseClient;
 
 use Psr\Log\LoggerInterface;
+use SevaCode\ClickHouseClient\Exceptions\ChcClientTimeoutException;
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
 use SevaCode\ClickHouseClient\Responses\ChcResponse;
 use SevaCode\ClickHouseClient\Transports\ChcHeaders;
@@ -216,15 +217,11 @@ class ChcClient
     }
 
     /**
-     * ping() without exceptions: false if the server is unreachable or not healthy.
+     * @deprecated since 2.0, removed in 3.0, use ping()
      */
     public function isAlive(): bool
     {
-        try {
-            return $this->ping();
-        } catch (ChcException) {
-            return false;
-        }
+        return $this->ping();
     }
 
     /**
@@ -281,7 +278,10 @@ class ChcClient
                 return $send();
             } catch (ChcException $e) {
                 $retryable = ChcReadOnly::Disabled !== $this->readOnly
-                    && ($e instanceof ChcConnectionException || in_array($e->getHttpStatus(), [502, 503, 504], true));
+                    && (
+                        ($e instanceof ChcConnectionException && !($e instanceof ChcClientTimeoutException))
+                        || in_array($e->getHttpStatus(), [502, 503, 504], true)
+                    );
                 if (!$retryable || $attempt >= $this->retries) {
                     throw $e;
                 }
@@ -312,12 +312,13 @@ class ChcClient
         return $this->getJson($query)['data'];
     }
 
-    /**
-     * @throws ChcException when the server is unreachable
-     */
     public function ping(): bool
     {
-        return $this->getRaw('') === ('Ok.' . PHP_EOL);
+        try {
+            return $this->getRaw('') === 'Ok.' . PHP_EOL;
+        } catch (ChcException) {
+            return false;
+        }
     }
 
     private function select(string $query, ChcFormat|string|null $format): ChcResponse

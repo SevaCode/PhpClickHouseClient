@@ -6,7 +6,7 @@ namespace SevaCode\ClickHouseClient\Tests\Integration;
 
 use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcClient;
-use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 use Symfony\Component\HttpClient\HttpClient;
 
 class TransportFeaturesTest extends IntegrationTestCase
@@ -45,7 +45,7 @@ class TransportFeaturesTest extends IntegrationTestCase
         $this->assertSame(20000, iterator_count($client->iterate($sql)));
         $this->assertGreaterThan(0, $client->getLastQueryLatency());
 
-        $e = $this->caughtException(fn() => $client->fetchAll('SELECT * FROM chc_no_such_table'), ChcException::class);
+        $e = $this->caughtException(fn() => $client->fetchAll('SELECT * FROM chc_no_such_table'), ChcServerException::class);
         $this->assertSame(60, $e->getCode());
     }
 
@@ -68,7 +68,7 @@ class TransportFeaturesTest extends IntegrationTestCase
             foreach ($client->iterate("SELECT number, throwIf(number = 300000, 'boom') FROM numbers(400000)", [], ['max_block_size' => 1000]) as $row) {
                 $rows++;
             }
-        }, ChcException::class);
+        }, ChcServerException::class);
         $this->assertSame(395, $e->getCode());
         $this->assertLessThanOrEqual(300000, $rows);
     }
@@ -86,7 +86,7 @@ class TransportFeaturesTest extends IntegrationTestCase
         $writeClient->write("CREATE TABLE $table (id UInt32, s String, d DateTime, a Array(String)) ENGINE = Memory");
         try {
             $client = $client->withReadOnly(ChcReadOnly::AllowSettings);
-            $e = $this->caughtException(fn() => $client->insert($table, [['id' => 1, 's' => 'x', 'd' => '2024-01-01 00:00:00', 'a' => []]]), ChcException::class);
+            $e = $this->caughtException(fn() => $client->insert($table, [['id' => 1, 's' => 'x', 'd' => '2024-01-01 00:00:00', 'a' => []]]), ChcServerException::class);
             $this->assertSame(164, $e->getCode()); // READONLY
 
             $writeClient->insert($table, (static function () {
@@ -103,7 +103,7 @@ class TransportFeaturesTest extends IntegrationTestCase
             );
             $this->assertSame('list', $writeClient->fetchOne("SELECT s FROM $table WHERE id = 100000"));
 
-            $e = $this->caughtException(fn() => $writeClient->insert($table, [['id' => 'not a number']]), ChcException::class);
+            $e = $this->caughtException(fn() => $writeClient->insert($table, [['id' => 'not a number']]), ChcServerException::class);
             $this->assertNotSame(0, $e->getCode());
         } finally {
             $writeClient->write("DROP TABLE IF EXISTS $table");

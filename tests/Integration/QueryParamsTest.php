@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
 use SevaCode\ClickHouseClient\ChcReadOnly;
-use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 
 class QueryParamsTest extends IntegrationTestCase
 {
@@ -75,7 +75,7 @@ class QueryParamsTest extends IntegrationTestCase
         $client = $this->client();
         $table = 'chc_it_' . bin2hex(random_bytes(4));
 
-        $e = $this->caughtException(fn() => $client->write("CREATE TABLE $table (x UInt8) ENGINE = Memory"), ChcException::class);
+        $e = $this->caughtException(fn() => $client->write("CREATE TABLE $table (x UInt8) ENGINE = Memory"), ChcServerException::class);
         $this->assertSame(164, $e->getCode()); // READONLY
 
         $writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
@@ -90,7 +90,7 @@ class QueryParamsTest extends IntegrationTestCase
 
     public function testMissingParameterIsServerError(): void
     {
-        $e = $this->caughtException(fn() => $this->client()->fetchOne('SELECT {v:UInt8}'), ChcException::class);
+        $e = $this->caughtException(fn() => $this->client()->fetchOne('SELECT {v:UInt8}'), ChcServerException::class);
         $this->assertSame(456, $e->getCode()); // UNKNOWN_QUERY_PARAMETER
     }
 
@@ -101,7 +101,7 @@ class QueryParamsTest extends IntegrationTestCase
         $this->assertSame(100000, $client->fetchOne('SELECT toUInt32(length({s:String})) AS v', ['s' => $long]));
         $this->assertSame(100000, $client->fetchOne("SELECT toUInt32(length('$long')) AS v"));
 
-        $e = $this->caughtException(fn() => $client->execute('CREATE TABLE chc_it_ro (x UInt8) ENGINE = Memory'), ChcException::class);
+        $e = $this->caughtException(fn() => $client->execute('CREATE TABLE chc_it_ro (x UInt8) ENGINE = Memory'), ChcServerException::class);
         $this->assertSame(164, $e->getCode()); // READONLY
     }
 
@@ -113,7 +113,7 @@ class QueryParamsTest extends IntegrationTestCase
         $this->assertSame(1, $client->fetchOne('SELECT toUInt8(1) AS v'));
 
         $client = $client->withCredentials('chc_no_such_user', 'x');
-        $e = $this->caughtException(fn() => $client->fetchOne('SELECT 1'), ChcException::class);
+        $e = $this->caughtException(fn() => $client->fetchOne('SELECT 1'), ChcServerException::class);
         $this->assertContains($e->getCode(), [192, 516]); // UNKNOWN_USER / AUTHENTICATION_FAILED
     }
 }

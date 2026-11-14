@@ -19,6 +19,10 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 - Non-ping queries use POST with SQL in the body and `Content-Type: text/plain; charset=UTF-8`;
   the default read-only level is `2`, configurable with `withReadOnly(ChcReadOnly|int)`;
   `ChcReadOnly` enum: `Disabled` (0), `Strict` (1), `AllowSettings` (2).
+- `ping()` returns `false` instead of throwing for client/server errors; `isAlive()` is deprecated.
+- Exceptions distinguish ClickHouse server errors, connection failures/client timeouts, and HTTP
+  errors without a ClickHouse code. `getCode()` returns the ClickHouse code or `0`; use
+  `getHttpStatus()` for the HTTP status. `ChcTimeoutExceededException` represents server error 159.
 
 ## [1.4]
 

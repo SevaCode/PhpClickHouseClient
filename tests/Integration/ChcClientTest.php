@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
 use SevaCode\ClickHouseClient\ChcReadOnly;
-use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcFormat;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 
 class ChcClientTest extends IntegrationTestCase
 {
@@ -36,13 +36,13 @@ class ChcClientTest extends IntegrationTestCase
         $client = $this->client();
         $table = 'chc_it_' . bin2hex(random_bytes(4));
 
-        $e = $this->caughtException(fn() => $client->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory"), ChcException::class);
+        $e = $this->caughtException(fn() => $client->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory"), ChcServerException::class);
         $this->assertSame(164, $e->getCode()); // READONLY
 
         $writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
         try {
             $writeClient->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory");
-            $e = $this->caughtException(fn() => $client->execute("INSERT INTO $table VALUES (1)"), ChcException::class);
+            $e = $this->caughtException(fn() => $client->execute("INSERT INTO $table VALUES (1)"), ChcServerException::class);
             $this->assertSame(164, $e->getCode()); // READONLY
             $writeClient->execute("INSERT INTO $table VALUES (1), (2)");
             $this->assertSame([['c' => 2]], $client->getJsonData("SELECT toUInt8(count()) AS c FROM $table"));
@@ -53,7 +53,7 @@ class ChcClientTest extends IntegrationTestCase
 
     public function testUnknownTableError(): void
     {
-        $e = $this->caughtException(fn() => $this->client()->getJson('SELECT * FROM chc_no_such_table'), ChcException::class);
+        $e = $this->caughtException(fn() => $this->client()->getJson('SELECT * FROM chc_no_such_table'), ChcServerException::class);
         $this->assertSame(60, $e->getCode()); // UNKNOWN_TABLE
         $this->assertStringContainsString('chc_no_such_table', (string)$e->getQuery());
     }
@@ -70,10 +70,10 @@ class ChcClientTest extends IntegrationTestCase
         $client = $this->client()->withSettings(['max_block_size' => 1000]);
         $sql = "SELECT number, throwIf(number = 300000, 'boom') FROM numbers(400000)";
 
-        $e = $this->caughtException(fn() => $client->getJson($sql), ChcException::class);
+        $e = $this->caughtException(fn() => $client->getJson($sql), ChcServerException::class);
         $this->assertSame(395, $e->getCode()); // FUNCTION_THROW_IF_VALUE_IS_NON_ZERO
 
-        $e = $this->caughtException(fn() => $client->getRaw($sql, ChcFormat::TabSeparated), ChcException::class);
+        $e = $this->caughtException(fn() => $client->getRaw($sql, ChcFormat::TabSeparated), ChcServerException::class);
         $this->assertSame(395, $e->getCode());
     }
 
@@ -90,7 +90,7 @@ class ChcClientTest extends IntegrationTestCase
     {
         $e = $this->caughtException(
             fn() => $this->client()->getJsonPool(['SELECT * FROM chc_no_such_table'], fn() => null),
-            ChcException::class,
+            ChcServerException::class,
         );
         $this->assertSame(60, $e->getCode());
     }

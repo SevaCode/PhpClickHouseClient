@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
 use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\Exceptions\ChcClientTimeoutException;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
-use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use SevaCode\ClickHouseClient\Tests\TestCase;
 use Symfony\Component\HttpClient\Exception\TimeoutException;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -64,7 +64,7 @@ class GetJsonPoolTest extends TestCase
     public function testRequestTimeTimeoutRetainsOriginalExceptionAndQuery(): void
     {
         $previous = new TimeoutException('Request timed out');
-        $e = $this->poolFailure(fn() => throw $previous, ChcTimeoutExceededException::class);
+        $e = $this->poolFailure(fn() => throw $previous, ChcClientTimeoutException::class);
         $this->assertSame($previous->getMessage(), $e->getMessage());
         $this->assertSame(0, $e->getCode());
         $this->assertSame($previous, $e->getPrevious());
@@ -75,8 +75,9 @@ class GetJsonPoolTest extends TestCase
         $e = $this->poolFailure(fn() => new MockResponse((function () {
             yield 'partial body';
             yield ''; // MockResponse represents an idle timeout with an empty chunk.
-        })(), ['http_code' => 200]), ChcTimeoutExceededException::class);
-        $this->assertSame(200, $e->getCode());
+        })(), ['http_code' => 200]), ChcClientTimeoutException::class);
+        $this->assertSame(0, $e->getCode());
+        $this->assertSame(200, $e->getHttpStatus());
         $this->assertInstanceOf(TimeoutExceptionInterface::class, $e->getPrevious());
         $this->assertSame($e->getPrevious()->getMessage(), $e->getMessage());
     }

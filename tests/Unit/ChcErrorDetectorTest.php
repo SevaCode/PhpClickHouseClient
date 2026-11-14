@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
-use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\Exceptions\ChcHttpException;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use SevaCode\ClickHouseClient\Tests\TestCase;
 use SevaCode\ClickHouseClient\Transports\ChcErrorDetector;
@@ -35,7 +36,7 @@ class ChcErrorDetectorTest extends TestCase
             "1\t2\n3\t4\nCode: 395. DB::Exception: boom (FOO) (version 24.1.4.20 (official build))\n",
             200, ['plain'], 'q',
         );
-        $this->assertInstanceOf(ChcException::class, $e);
+        $this->assertInstanceOf(ChcServerException::class, $e);
         $this->assertSame(395, $e->getCode());
         $this->assertNotInstanceOf(ChcMemoryLimitExceededException::class, $e);
 
@@ -81,23 +82,23 @@ class ChcErrorDetectorTest extends TestCase
         $ok = 'HTTP/1.1 200 OK';
 
         // X-ClickHouse-Format сужает выбор сигнатуры
-        $this->caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok, 'X-ClickHouse-Format: TabSeparated'], 'q'), ChcException::class);
+        $this->caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok, 'X-ClickHouse-Format: TabSeparated'], 'q'), ChcServerException::class);
         $this->caughtException(fn() => ChcErrorDetector::throwIfError($jsonError, 200, [$ok, 'X-ClickHouse-Format: JSON'], 'q'), ChcMemoryLimitExceededException::class);
-        $this->caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, [$ok, 'X-ClickHouse-Format: XML'], 'q'), ChcException::class);
+        $this->caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, [$ok, 'X-ClickHouse-Format: XML'], 'q'), ChcServerException::class);
         // ...и отсекает чужие: JSON-ошибка при формате TabSeparated не детектится
         ChcErrorDetector::throwIfError($jsonError, 200, [$ok, 'X-ClickHouse-Format: TabSeparated'], 'q');
 
         // Без X-ClickHouse-Format семейство определяется по Content-Type
-        $this->caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok, 'Content-Type: text/tab-separated-values; charset=UTF-8'], 'q'), ChcException::class);
+        $this->caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok, 'Content-Type: text/tab-separated-values; charset=UTF-8'], 'q'), ChcServerException::class);
         $this->caughtException(fn() => ChcErrorDetector::throwIfError($jsonError, 200, [$ok, 'Content-Type: application/json'], 'q'), ChcMemoryLimitExceededException::class);
-        $this->caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, [$ok, 'Content-Type: application/xml'], 'q'), ChcException::class);
+        $this->caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, [$ok, 'Content-Type: application/xml'], 'q'), ChcServerException::class);
 
         // Ни формата, ни Content-Type — все сигнатуры
-        $this->caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok], 'q'), ChcException::class);
+        $this->caughtException(fn() => ChcErrorDetector::throwIfError($tsvError, 200, [$ok], 'q'), ChcServerException::class);
         $this->caughtException(fn() => ChcErrorDetector::throwIfError($jsonError, 200, [], 'q'), ChcMemoryLimitExceededException::class);
 
         // Неоднозначный Content-Type (text/plain) — все сигнатуры
-        $this->caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, ['Content-Type: text/plain'], 'q'), ChcException::class);
+        $this->caughtException(fn() => ChcErrorDetector::throwIfError($xmlError, 200, ['Content-Type: text/plain'], 'q'), ChcServerException::class);
     }
 
     public function testDetectsTaggedExceptionBlock(): void
@@ -107,7 +108,7 @@ class ChcErrorDetectorTest extends TestCase
         $block = "\r\n__exception__\r\nabcd\r\n$message\n" . strlen($message) . " abcd\r\n__exception__\r\n";
         foreach (['JSON', 'TabSeparated', 'JSONCompactEachRow'] as $format) {
             $headers = ['HTTP/1.1 200 OK', "X-ClickHouse-Format: $format", 'X-ClickHouse-Exception-Tag: abcd'];
-            $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError("1\t2\n" . $block, 200, $headers, 'q'), ChcException::class);
+            $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError("1\t2\n" . $block, 200, $headers, 'q'), ChcServerException::class);
             $this->assertSame(395, $e->getCode());
             $this->assertSame($message, $e->getMessage());
             $this->assertSame('q', $e->getQuery());
@@ -123,18 +124,20 @@ class ChcErrorDetectorTest extends TestCase
     public function testUnifiesStatusAndTailErrors(): void
     {
         // не-200 + пустое тело: статус-строка сохраняется в сообщении
-        $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError('', 503, ['HTTP/1.1 503 Service Unavailable'], 'q'), ChcException::class);
+        $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError('', 503, ['HTTP/1.1 503 Service Unavailable'], 'q'), ChcHttpException::class);
         $this->assertSame('Unexpected response status: HTTP/1.1 503 Service Unavailable', $e->getMessage());
-        $this->assertSame(503, $e->getCode());
+        $this->assertSame(0, $e->getCode());
+        $this->assertSame(503, $e->getHttpStatus());
         $this->assertSame('q', $e->getQuery());
 
-        // не-200 + пустое тело + нет статус-строки: fallback на числовой код
-        $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError('', 503, [], 'q'), ChcException::class);
+        // не-200 + пустое тело + нет статус-строки: fallback на числовой статус
+        $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError('', 503, [], 'q'), ChcHttpException::class);
         $this->assertSame('Unexpected response status: 503', $e->getMessage());
-        $this->assertSame(503, $e->getCode());
+        $this->assertSame(0, $e->getCode());
+        $this->assertSame(503, $e->getHttpStatus());
 
         // не-200 + тело: тело становится сообщением как раньше
-        $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError('Code: 60. DB::Exception: Unknown table', 500, ['HTTP/1.1 500 Internal Server Error'], 'q'), ChcException::class);
+        $e = $this->caughtException(fn() => ChcErrorDetector::throwIfError('Code: 60. DB::Exception: Unknown table', 500, ['HTTP/1.1 500 Internal Server Error'], 'q'), ChcServerException::class);
         $this->assertSame('Code: 60. DB::Exception: Unknown table', $e->getMessage());
         $this->assertSame(60, $e->getCode());
 

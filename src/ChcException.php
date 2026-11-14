@@ -9,24 +9,47 @@ declare(strict_types=1);
 namespace SevaCode\ClickHouseClient;
 
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
+use SevaCode\ClickHouseClient\Exceptions\ChcClientTimeoutException;
+use SevaCode\ClickHouseClient\Exceptions\ChcHttpException;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
 use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
+/**
+ * Base class of every exception thrown by the client; `catch (ChcException)` catches them all.
+ *
+ *     ChcException                          other failures, e.g. a malformed 200 response
+ *     ├── ChcServerException                ClickHouse returned an error (Code: N)
+ *     │   ├── ChcMemoryLimitExceededException   241
+ *     │   └── ChcTimeoutExceededException       159, server-side timeout
+ *     ├── ChcConnectionException            no complete HTTP response (network, TLS, broken connection)
+ *     │   └── ChcClientTimeoutException     HTTP client timeout
+ *     └── ChcHttpException                  HTTP status >= 300 without a ClickHouse error code
+ *
+ * getCode() is the ClickHouse error code or 0; getHttpStatus() is the HTTP status.
+ */
 class ChcException extends \Exception
 {
     private ?string $query = null;
     private ?int $httpStatus = null;
     private ?int $clickHouseErrorCode = null;
 
+    /**
+     * Builds the most specific exception: client timeout, then ClickHouse error code
+     * (from `Code: N` or the error name), then transport failure, then HTTP status >= 300.
+     *
+     * @param int|string $code HTTP status of the response, 0 if there was none
+     * @param ?\Throwable $previous the Symfony HttpClient exception, if any
+     * @param ?string $query SQL that failed, available through getQuery()
+     */
     public static function create(string $message = '', int|string $code = 0, ?\Throwable $previous = null, ?string $query = null): self
     {
         $httpStatus = is_numeric($code) && $code >= 100 && $code <= 599 ? (int)$code : null;
         $clickHouseErrorCode = null;
 
-        // Входной $code может быть HTTP-статусом. Серверный Code: N точнее и имеет
-        // приоритет над ним и над символическими названиями ошибок в тексте.
+        // Code: N in the response body is more specific than the HTTP status.
         // Формат подтверждён getExceptionMessageAndPattern() в ClickHouse (src/Common/Exception.cpp):
         // https://github.com/ClickHouse/ClickHouse/blob/master/src/Common/Exception.cpp
         // Code example: stream << "Code: " << e.code() << ". " << text;
@@ -45,16 +68,23 @@ class ChcException extends \Exception
             }
         }
 
-        // Клиентский таймаут получает специальный класс, но сохраняет свой код (например, 0).
-        // Если заменить его на 159, по коду нельзя будет отличить ответ ClickHouse от таймаута HTTP-клиента.
-        if ($previous instanceof TimeoutExceptionInterface || $code == 159) {
-            $e = new ChcTimeoutExceededException($message, (int)$code, $previous);
-        } elseif ($code == 241) {
-            $e = new ChcMemoryLimitExceededException($message, (int)$code, $previous);
-        } elseif ($previous instanceof TransportExceptionInterface && null === $clickHouseErrorCode) {
-            $e = new ChcConnectionException($message, (int)$code, $previous);
+        $exceptionCode = $clickHouseErrorCode ?? 0;
+        if ($previous instanceof TimeoutExceptionInterface) {
+            $e = new ChcClientTimeoutException($message, $exceptionCode, $previous);
+        } elseif (null !== $clickHouseErrorCode) {
+            if (159 === $clickHouseErrorCode) {
+                $e = new ChcTimeoutExceededException($message, $exceptionCode, $previous);
+            } elseif (241 === $clickHouseErrorCode) {
+                $e = new ChcMemoryLimitExceededException($message, $exceptionCode, $previous);
+            } else {
+                $e = new ChcServerException($message, $exceptionCode, $previous);
+            }
+        } elseif ($previous instanceof TransportExceptionInterface) {
+            $e = new ChcConnectionException($message, $exceptionCode, $previous);
+        } elseif (null !== $httpStatus && $httpStatus >= 300) {
+            $e = new ChcHttpException($message, $exceptionCode, $previous);
         } else {
-            $e = new self($message, (int)$code, $previous);
+            $e = new self($message, $exceptionCode, $previous);
         }
 
         if ($query !== null) {
@@ -67,7 +97,8 @@ class ChcException extends \Exception
     }
 
     /**
-     * HTTP status of the ClickHouse response (200 for errors sent mid-stream), null — no response.
+     * HTTP status of the response (200 for errors sent mid-stream), null — no response.
+     * getCode() returns a ClickHouse error code or 0, never this status.
      */
     public function getHttpStatus(): ?int
     {
@@ -76,13 +107,16 @@ class ChcException extends \Exception
 
     /**
      * ClickHouse error code ('Code: N.' in the message), null — not a ClickHouse error.
-     * getCode() keeps the old behaviour: ClickHouse error code if known, otherwise HTTP status.
+     * getCode() returns this value or 0; use getHttpStatus() for the HTTP status.
      */
     public function getClickHouseErrorCode(): ?int
     {
         return $this->clickHouseErrorCode;
     }
 
+    /**
+     * SQL of the failed request, null when unknown.
+     */
     public function getQuery(): ?string
     {
         return $this->query;

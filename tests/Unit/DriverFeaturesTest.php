@@ -8,8 +8,10 @@ use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcFormat;
+use SevaCode\ClickHouseClient\Exceptions\ChcClientTimeoutException;
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
-use SevaCode\ClickHouseClient\Exceptions\ChcTimeoutExceededException;
+use SevaCode\ClickHouseClient\Exceptions\ChcHttpException;
+use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 use SevaCode\ClickHouseClient\Tests\TestCase;
 use Symfony\Component\HttpClient\Exception\TimeoutException;
 use Symfony\Component\HttpClient\Exception\TransportException;
@@ -37,22 +39,27 @@ class DriverFeaturesTest extends TestCase
     public function testExceptionCodes(): void
     {
         $e = ChcException::create('Code: 60. DB::Exception: Unknown table', 404);
+        $this->assertInstanceOf(ChcServerException::class, $e);
         $this->assertSame(60, $e->getCode());
         $this->assertSame(60, $e->getClickHouseErrorCode());
         $this->assertSame(404, $e->getHttpStatus());
 
         $e = ChcException::create('Bad gateway', 502);
-        $this->assertSame(502, $e->getCode());
+        $this->assertInstanceOf(ChcHttpException::class, $e);
+        $this->assertSame(0, $e->getCode());
         $this->assertNull($e->getClickHouseErrorCode());
         $this->assertSame(502, $e->getHttpStatus());
 
         $e = ChcException::create('Couldn\'t connect', previous: new TransportException('x'));
         $this->assertInstanceOf(ChcConnectionException::class, $e);
+        $this->assertSame(0, $e->getCode());
         $this->assertNull($e->getHttpStatus());
         $this->assertNull($e->getClickHouseErrorCode());
 
         $e = ChcException::create('Idle timeout', previous: new TimeoutException('x'));
-        $this->assertInstanceOf(ChcTimeoutExceededException::class, $e);
+        $this->assertInstanceOf(ChcClientTimeoutException::class, $e);
+        $this->assertInstanceOf(ChcConnectionException::class, $e);
+        $this->assertSame(0, $e->getCode());
     }
 
     public function testQueryIdAndSummary(): void
@@ -128,7 +135,7 @@ class DriverFeaturesTest extends TestCase
     {
         $requests = [];
         $client = $this->client($requests, [
-            new MockResponse('', ['http_code' => 503]),
+            new MockResponse('', ['http_code' => 502]),
             new TransportException('Connection refused'),
             new MockResponse('ok', ['http_code' => 200]),
         ]);
@@ -140,7 +147,7 @@ class DriverFeaturesTest extends TestCase
         $requests = [];
         $client = $this->client($requests, [new MockResponse('', ['http_code' => 503]), new MockResponse('', ['http_code' => 503])]);
         $client = $client->withRetries(1, 0);
-        $e = $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcException::class);
+        $e = $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcHttpException::class);
         $this->assertSame(503, $e->getHttpStatus());
         $this->assertCount(2, $requests);
 
@@ -148,14 +155,21 @@ class DriverFeaturesTest extends TestCase
         $requests = [];
         $client = $this->client($requests, [new MockResponse('', ['http_code' => 503]), new MockResponse('ok')]);
         $client = $client->withRetries(3, 0)->withReadOnly(ChcReadOnly::Disabled);
-        $this->caughtException(fn() => $client->execute('INSERT INTO t VALUES (1)'), ChcException::class);
+        $this->caughtException(fn() => $client->execute('INSERT INTO t VALUES (1)'), ChcHttpException::class);
         $this->assertCount(1, $requests);
 
         // Not retried: ClickHouse error
         $requests = [];
-        $client = $this->client($requests, [new MockResponse('Code: 60. DB::Exception: Unknown table', ['http_code' => 404]), new MockResponse('ok')]);
+        $client = $this->client($requests, [new MockResponse('Code: 395. DB::Exception: query failed (version 24.1.4.20 (official build))', ['http_code' => 500]), new MockResponse('ok')]);
         $client = $client->withRetries(3, 0);
-        $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcException::class);
+        $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcServerException::class);
+        $this->assertCount(1, $requests);
+
+        // Not retried: client timeout
+        $requests = [];
+        $client = $this->client($requests, [new TimeoutException('Request timed out'), new MockResponse('ok')]);
+        $client = $client->withRetries(3, 0);
+        $this->caughtException(fn() => $client->getRaw('SELECT 1'), ChcClientTimeoutException::class);
         $this->assertCount(1, $requests);
 
         // Default: no retries
@@ -165,18 +179,25 @@ class DriverFeaturesTest extends TestCase
         $this->assertCount(1, $requests);
     }
 
-    public function testIsAlive(): void
+    public function testPingIsNonThrowing(): void
+    {
+        $requests = [];
+        $this->assertTrue($this->client($requests, [new MockResponse("Ok.\n")])->ping());
+        $this->assertFalse($this->client($requests, [new TransportException('Connection refused')])->ping());
+        $this->assertFalse($this->client($requests, [new MockResponse('', ['http_code' => 500])])->ping());
+    }
+
+    public function testIsAliveDelegatesToPing(): void
     {
         $requests = [];
         $this->assertTrue($this->client($requests, [new MockResponse("Ok.\n")])->isAlive());
-        $this->assertFalse($this->client($requests, [new TransportException('Connection refused')])->isAlive());
-        $this->assertFalse($this->client($requests, [new MockResponse('', ['http_code' => 503])])->isAlive());
+        $this->assertFalse($this->client($requests, [new MockResponse('', ['http_code' => 500])])->isAlive());
     }
 
-    public function testDefaultHttpClientIsAliveReturnsFalseWhenConnectionFails(): void
+    public function testDefaultHttpClientPingReturnsFalseWhenConnectionFails(): void
     {
         $client = new ChcClient('http://127.0.0.1:1/');
-        $this->assertFalse(@$client->isAlive());
+        $this->assertFalse(@$client->ping());
     }
 
     public function testDefaultHttpClientConnectionFailureThrowsChcConnectionException(): void

@@ -41,6 +41,11 @@ Composer не обновит пользователей с `^1.x` до 2.0 са�
 Уровни `readonly` описаны enum `ChcReadOnly` (`Disabled` = 0, `Strict` = 1, `AllowSettings` = 2);
 `withReadOnly()` принимает enum или int 0–2, `getReadOnly()` возвращает enum.
 
+Клиентский таймаут Symfony — это `ChcClientTimeoutException extends ChcConnectionException`;
+`ChcTimeoutExceededException` означает только серверный таймаут с кодом 159. Для HTTP-ошибок без
+кода ClickHouse добавлен `ChcHttpException`. В 2.0 `isAlive()` — deprecated-синоним `ping()`,
+который будет удалён в 3.0.
+
 Не ломают совместимость, поэтому их можно сделать в любой версии без этого ADR:
 - перевести комментарии на английский;
 - PHP-CS-Fixer / PER-CS;

@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Exceptions;
 
-use SevaCode\ClickHouseClient\ChcException;
-
-class ChcMemoryLimitExceededException extends ChcException
+/**
+ * ClickHouse error 241 MEMORY_LIMIT_EXCEEDED: the query exceeded max_memory_usage or a server limit.
+ */
+class ChcMemoryLimitExceededException extends ChcServerException
 {
 }
