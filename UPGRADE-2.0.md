@@ -22,11 +22,11 @@ Use `ChcClient` instead of the `HttpClient` wrapper. `Mode::READONLY` and `Mode:
 by read-only levels:
 
 ```php
-$client = (new ChcClient())->withReadOnly(0); // replaces Mode::WRITE
+$client = (new ChcClient())->withReadOnly(ChcReadOnly::Disabled); // replaces Mode::WRITE
 ```
 
 - `getMode()` → `$client->getReadOnly()`; `setMode(Mode::READONLY|Mode::WRITE)` →
-  `$client = $client->withReadOnly(2|0)`.
+  `$client = $client->withReadOnly(ChcReadOnly::AllowSettings|ChcReadOnly::Disabled)`.
 - `getData($query)` → `$client->getJsonData($query)`.
 - `query($query)` → `$client->getRaw($query, $format)` for reads or
   `$client->execute($query, $format)->getBody()` for writes.
@@ -62,7 +62,7 @@ use its backed value: `'FORMAT ' . ChcFormat::JSON->value`.
 otherwise the original client remains unchanged:
 
 ```php
-$client = $client->withDatabase('analytics')->withReadOnly(0);
+$client = $client->withDatabase('analytics')->withReadOnly(ChcReadOnly::Disabled);
 ```
 
 | Removed method | Replacement |
@@ -72,7 +72,7 @@ $client = $client->withDatabase('analytics')->withReadOnly(0);
 | `addSettings($settings)` | `$client = $client->withSettings($settings)` |
 | `setCredentials($user, $password)` | `$client = $client->withCredentials($user, $password)` |
 | `setTimeout($seconds)` | `$client = $client->withTimeout($seconds)` |
-| `readOnly($value)` | `$client = $client->withReadOnly(2|0)`; use `getReadOnly()` to read the level |
+| `readOnly($value)` | `$client = $client->withReadOnly(ChcReadOnly::AllowSettings)` / `withReadOnly(ChcReadOnly::Disabled)`; `getReadOnly()` returns `ChcReadOnly` |
 | `setCompression($enabled)` | `$client = $client->withCompression($enabled)` |
 | `setHttpClient($httpClient)` | `$client = $client->withHttpClient($httpClient)` |
 | `setPoolConcurrency($concurrency)` | `$client = $client->withPoolConcurrency($concurrency)` |
@@ -81,8 +81,9 @@ $client = $client->withDatabase('analytics')->withReadOnly(0);
 | `setSqlLogger($logger)` | `$client = $client->withSqlLogger($logger)` |
 | `setReadOnlyOverPost($enabled)` | Removed; reads use POST by default (see below) |
 
-`withReadOnly(0)` allows writes and sends no `readonly` parameter; levels `1` and `2` send the
-corresponding ClickHouse setting. The default level is `2`.
+`withReadOnly()` accepts the `ChcReadOnly` enum or its integer value 0–2; other integers throw
+`InvalidArgumentException`. `ChcReadOnly::Disabled` (0) allows writes and sends no `readonly` parameter;
+`Strict` (1) and `AllowSettings` (2) send the corresponding ClickHouse setting. The default is `AllowSettings`.
 
 ### Reads over POST with readonly=2 (ADR-0002 #6)
 
@@ -91,7 +92,7 @@ Non-ping queries now use POST with SQL in the body and
 `setReadOnlyOverPost()` is removed because POST is the default. Read-only level `2` is the default.
 
 If your user profile sets `readonly=1`, the default request can fail with Code 164,
-`Cannot modify 'readonly' setting in readonly mode`. Use `$client = $client->withReadOnly(1);`.
+`Cannot modify 'readonly' setting in readonly mode`. Use `$client = $client->withReadOnly(ChcReadOnly::Strict);`.
 An explicit setting passed with `$client = $client->withSettings(['readonly' => 1])` is also preserved.
 See [ClickHouse query permissions](https://clickhouse.com/docs/operations/settings/permissions-for-queries).
 

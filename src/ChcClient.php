@@ -29,7 +29,7 @@ class ChcClient
         //'max_rows_to_group_by' => 2000000,
     ];
 
-    protected int $readOnlyLevel = 2;
+    protected ChcReadOnly $readOnly = ChcReadOnly::AllowSettings;
 
     /** Query latency in seconds. */
     protected ?float $last_query_latency = null;
@@ -104,19 +104,24 @@ class ChcClient
         return $clone;
     }
 
-    public function withReadOnly(int $level): static
+    /**
+     * ClickHouse `readonly` level for queries: a ChcReadOnly case or its integer value 0–2.
+     * An explicit `readonly` passed through withSettings() or per-query settings takes precedence.
+     */
+    public function withReadOnly(ChcReadOnly|int $level): static
     {
-        if (!in_array($level, [0, 1, 2], true)) {
-            throw new \InvalidArgumentException('Read-only level must be 0, 1 or 2');
+        if (is_int($level)) {
+            $level = ChcReadOnly::tryFrom($level)
+                ?? throw new \InvalidArgumentException('Read-only level must be 0, 1 or 2');
         }
         $clone = clone $this;
-        $clone->readOnlyLevel = $level;
+        $clone->readOnly = $level;
         return $clone;
     }
 
-    public function getReadOnly(): int
+    public function getReadOnly(): ChcReadOnly
     {
-        return $this->readOnlyLevel;
+        return $this->readOnly;
     }
 
     /**
@@ -156,7 +161,7 @@ class ChcClient
 
     /**
      * Opt-in retries of read-only queries on connection errors and HTTP 502/503/504.
-     * Writes (withReadOnly(0), insert()), timeouts and ClickHouse errors are never retried.
+     * Writes (withReadOnly(ChcReadOnly::Disabled), insert()), timeouts and ClickHouse errors are never retried.
      */
     public function withRetries(int $count, float $delaySeconds = 0.5): static
     {
@@ -272,7 +277,7 @@ class ChcClient
             try {
                 return $send();
             } catch (ChcException $e) {
-                $retryable = $this->readOnlyLevel > 0
+                $retryable = ChcReadOnly::Disabled !== $this->readOnly
                     && (
                         ($e instanceof ChcConnectionException && !($e instanceof ChcClientTimeoutException))
                         || in_array($e->getHttpStatus(), [502, 503, 504], true)
@@ -395,7 +400,7 @@ class ChcClient
 
     /**
      * DDL/DML (CREATE, INSERT ... VALUES, ALTER ...) with query parameters.
-     * Honours read-only mode: use withReadOnly(0) to allow writes.
+     * Honours read-only mode: use withReadOnly(ChcReadOnly::Disabled) to allow writes.
      *
      * @param array<string, mixed> $params
      * @param array<string, mixed> $settings
@@ -557,7 +562,7 @@ class ChcClient
      * Streaming insert: INSERT INTO $table [($columns)] FORMAT JSONEachRow, the body is sent in chunks
      * while $rows (array or generator) is consumed. Rows are associative arrays; with $columns
      * given, list rows are matched to $columns by position.
-     * Honours read-only mode: use withReadOnly(0) to allow inserts.
+     * Honours read-only mode: use withReadOnly(ChcReadOnly::Disabled) to allow inserts.
      *
      * $table is an identifier written into SQL as is (e.g. 'db.events') — never pass user input.
      *
@@ -579,8 +584,8 @@ class ChcClient
         $this->logSql($sql);
 
         $settings = array_merge($this->settings, $settings);
-        if ($this->readOnlyLevel > 0 && !array_key_exists('readonly', $settings)) {
-            $settings['readonly'] = $this->readOnlyLevel;
+        if (ChcReadOnly::Disabled !== $this->readOnly && !array_key_exists('readonly', $settings)) {
+            $settings['readonly'] = $this->readOnly->value;
         }
         $request = (new ChcRequest)->setSettings($settings)->setQuery($sql)->setReturnFormat(null);
 
@@ -601,7 +606,7 @@ class ChcClient
     private function symfonyTransport(): ChcSymfonyCurlTransport
     {
         $transport = (new ChcSymfonyCurlTransport($this->httpClient ?? ($this->defaultHttpClient ??= $this->createHttpClient())))
-            ->setReadOnlyLevel($this->readOnlyLevel)
+            ->setReadOnlyLevel($this->readOnly->value)
             ->setCompression($this->compression)
             ->setTimeout($this->timeout);
         if (null !== $this->httpClient) {

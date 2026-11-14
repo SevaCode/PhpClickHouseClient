@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcFormat;
 use SevaCode\ClickHouseClient\Exceptions\ChcMemoryLimitExceededException;
 use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
@@ -38,7 +39,7 @@ class ChcClientTest extends IntegrationTestCase
         $e = $this->caughtException(fn() => $client->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory"), ChcServerException::class);
         $this->assertSame(164, $e->getCode()); // READONLY
 
-        $writeClient = $client->withReadOnly(0);
+        $writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
         try {
             $writeClient->execute("CREATE TABLE $table (x UInt8) ENGINE = Memory");
             $e = $this->caughtException(fn() => $client->execute("INSERT INTO $table VALUES (1)"), ChcServerException::class);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\Exceptions\ChcServerException;
 
 class QueryParamsTest extends IntegrationTestCase
@@ -77,7 +78,7 @@ class QueryParamsTest extends IntegrationTestCase
         $e = $this->caughtException(fn() => $client->write("CREATE TABLE $table (x UInt8) ENGINE = Memory"), ChcServerException::class);
         $this->assertSame(164, $e->getCode()); // READONLY
 
-        $writeClient = $client->withReadOnly(0);
+        $writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
         try {
             $writeClient->write("CREATE TABLE $table (x UInt8, s String) ENGINE = Memory");
             $writeClient->write("INSERT INTO $table VALUES ({x:UInt8}, {s:String})", ['x' => 1, 's' => "it's"]);
