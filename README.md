@@ -48,6 +48,22 @@ $writeClient = $client->withReadOnly(ChcReadOnly::Disabled); // or withReadOnly(
 $writeClient->write('INSERT INTO users VALUES ({id:UInt64}, {name:String})', ['id' => 43, 'name' => 'Ann']);
 ````
 
+### Typed parameters
+
+`ChcParam` renders its own `{name:Type}` placeholder. Its value is sent separately as `param_<name>`:
+
+````php
+$types = ChcParam::of(['click', 'view'], ChcType::Array(ChcType::String()), 'types');
+$rows = $client->fetchAll(
+    "SELECT * FROM events WHERE user_id = {id:UInt64} AND type IN $types",
+    ['id' => 42, $types],
+);
+````
+
+The name is optional; omitted names are generated as `chc_N`. Pass a parameter in a list or under a
+matching string key. An unused `ChcParam` throws before the request is sent. Use `ChcType::of()` for
+other type expressions. `ChcType` is also `Stringable`, for example `CAST(x AS $type)`.
+
 The last argument of every method is per-query ClickHouse settings, e.g. `['max_execution_time' => 5]`.
 PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside arrays), `DateTimeInterface` →
 `Y-m-d H:i:s[.u]` (pass `'Y-m-d'` strings for `Date`), lists → `Array(...)`, string-keyed arrays → `Map(...)`.
