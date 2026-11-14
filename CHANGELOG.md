@@ -3,7 +3,7 @@
 All notable changes. The project follows [Semantic Versioning](https://semver.org/);
 1.x keeps backward compatibility (see `docs/adr/0001-backward-compatibility.md`).
 
-## [Unreleased] — 2.0
+## [2.0.0] — 2026-11-14
 
 ### Removed
 - `HttpClient`, `Mode`, and `Transports\ChcHttpTransport`.
