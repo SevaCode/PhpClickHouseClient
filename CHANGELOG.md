@@ -3,7 +3,7 @@
 All notable changes. The project follows [Semantic Versioning](https://semver.org/);
 1.x keeps backward compatibility (see `docs/adr/0001-backward-compatibility.md`).
 
-## [1.4]
+## [1.4.0] — 2026-11-14
 
 ### Deprecated
 - `HttpClient`, `Mode`, `Transports\ChcHttpTransport`, and `ChcClient::setReadOnlyOverPost()` are removed in 2.0; see ADR-0002.
