@@ -27,9 +27,20 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
   exposes `data`, `meta`, `rows`, `rowsBeforeLimitAtLeast`, `statistics`, `totals`, `extremes`,
   `startTime`, `queryId` and `summary`. `getJsonPool()` is deprecated (removal in 3.0).
 
-## [1.4]
+## [1.4.0] — 2026-11-14
+
+### Deprecated
+- `HttpClient`, `Mode`, `Transports\ChcHttpTransport`, and `ChcClient::setReadOnlyOverPost()` are removed in 2.0; see ADR-0002.
+- `ChcClient::readOnly()`, `setDatabase()`, `addSettings()`, `setCredentials()`, `setTimeout()`,
+  `setHttpClient()`, `setCompression()`, `setPoolConcurrency()`, `setRetries()`, `setSessionId()`,
+  `setUrl()`, and `setSqlLogger()`; use the corresponding `with*()` method (or `getReadOnly()`).
+- `ChcClient::getJsonPool()`; use `pool()`. In 2.0 it stays as a deprecated wrapper, removed in 3.0.
 
 ### Added
+- Immutable `ChcClient::with*()` configuration methods, constructor `(url, httpClient)`, and `getReadOnly()`.
+- `ChcReadOnly` enum (`Disabled`, `Strict`, `AllowSettings`); `withReadOnly()` accepts it or an int 0–2.
+- `ChcClient::pool()` returning a `ChcResult` per query (`data`, `meta`, `rows`, `rowsBeforeLimitAtLeast`,
+  `statistics`, `totals`, `extremes`, `startTime`, `queryId`, `summary`).
 - Server-side query parameters (`{name:Type}` + `ChcParamEncoder`) and `fetchAll()`, `fetchRow()`,
   `fetchOne()`, `fetchColumn()`, `write()` with per-query settings.
 - `setCredentials()`, `setTimeout()`, opt-in `setReadOnlyOverPost()`.

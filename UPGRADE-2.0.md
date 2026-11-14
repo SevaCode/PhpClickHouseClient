@@ -1,7 +1,6 @@
 # Upgrade from 1.x to 2.0
 
-> Draft. The list of breaking changes is decided in
-> [ADR-0002](docs/adr/0002-version-2.md); this file is completed as items are accepted and implemented.
+The breaking changes are listed in [ADR-0002](docs/adr/0002-version-2.md).
 
 ## Recommended path
 

@@ -86,7 +86,8 @@
 - [x] Ветка [`1.4`](https://github.com/SevaCode/PhpClickHouseClient/tree/1.4) — только багфиксы; `master` → 2.0, branch-alias `2.0.x-dev` ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
 - [x] [ADR-0002](../adr/0002-version-2.md): список ломающих изменений 2.0 (принято: 1–10, пункт 11 отклонён) ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
 - [x] Черновик [`UPGRADE-2.0.md`](../../UPGRADE-2.0.md) ([PR #6](https://github.com/sevacode/phpclickhouseclient/pull/6)).
-- [ ] `@deprecated` в ветке `1.4` для всего, что удаляется по принятым пунктам ADR-0002.
+- [x] `@deprecated` в ветке `1.4` для всего, что удаляется по принятым пунктам ADR-0002 ([PR #7](https://github.com/sevacode/phpclickhouseclient/pull/7), [PR #11](https://github.com/sevacode/phpclickhouseclient/pull/11), [PR #14](https://github.com/sevacode/phpclickhouseclient/pull/14)).
+- [x] Релизы `1.4.0` (ветка `1.4`) и `2.0.0` (`master`).
 
 ## Этап 5. Версия 2.0 (нарушает обратную совместимость)
 
