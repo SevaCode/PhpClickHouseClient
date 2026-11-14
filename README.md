@@ -1,59 +1,99 @@
 # PhpClickHouseClient
-PHP Client for [ClickHouse](https://github.com/ClickHouse/ClickHouse) HTTP interface
 
-## Requirements
+[![CI](https://github.com/SevaCode/PhpClickHouseClient/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SevaCode/PhpClickHouseClient/actions/workflows/ci.yml)
+[![Packagist Version](https://img.shields.io/packagist/v/seva-code/php-click-house-client)](https://packagist.org/packages/seva-code/php-click-house-client)
+[![PHP Version](https://img.shields.io/badge/PHP-8.3%2B-777BB4?logo=php)](https://www.php.net/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-PHP 8.3+ and `symfony/http-client` `^6.4 || ^7.0`.
+PHP client for the [ClickHouse](https://github.com/ClickHouse/ClickHouse) HTTP interface.
 
-# Use examples
-````php
-$data = (new ChcClient())->getJsonData($query);
-````
+Features:
+- Safe server-side query parameters, including typed `ChcParam` values.
+- Stream results with `iterate()` and send inserts without loading all rows into memory.
+- Optional HTTP compression.
+- Parallel queries with `pool()`.
+- Opt-in retries for eligible read-only requests.
+- Typed exception hierarchy for ClickHouse, HTTP, connection, and client-timeout failures.
+- Read-only queries by default.
+- Immutable `with*()` configuration methods.
 
-````php
-$client = new ChcClient();
+## Installation
 
-if (!$client->ping()) {
-    throw new Exception('ClickHouse is down.');
+Requires PHP 8.3+ and `symfony/http-client` `^6.4 || ^7.0`.
+
+```bash
+composer require seva-code/php-click-house-client:^2.0
+```
+
+## Versions
+
+| Release | PHP | Branch | Maintenance | ClickHouse |
+|---|---|---|---|---|
+| 2.x | 8.3+ | `master` | Active | 24.1+ |
+| 1.4 | 8.1+ | `1.4` | Bug fixes | 24.1+ |
+
+See the [2.0 upgrade guide](UPGRADE-2.0.md) and [changelog](CHANGELOG.md).
+
+## Quick start
+
+```php
+use SevaCode\ClickHouseClient\{ChcClient, ChcParam, ChcType};
+
+$client = (new ChcClient('http://localhost:8123/'))->withCredentials('default', 'secret');
+$id = ChcParam::UInt64(42);
+$types = ChcParam::Array(['click', 'view'], ChcType::String());
+$rows = $client->fetchAll("SELECT * FROM events WHERE user_id = $id AND type IN $types", [$id, $types]);
+
+foreach ($client->iterate('SELECT * FROM events', []) as $row) {
+    // Process one row at a time.
 }
+```
 
-try {
-    $result = $client->getRaw($query, ChcFormat::JSONEachRow);
-}
-catch (ChcException $e) {
-    $error = $e->getMessage();
-}
-$latency = $client->getLastQueryLatency();
-````
+## Connection and configuration
+
+`ChcClient` defaults to `http://localhost:8123/`. Its constructor accepts an optional URL and a
+`Symfony\Contracts\HttpClient\HttpClientInterface`; `withUrl()` changes the endpoint. The immutable
+`with*()` methods return a configured clone:
+
+```php
+$client = (new ChcClient('http://localhost:8123/'))
+    ->withCredentials('reader', 'secret')
+    ->withDatabase('analytics')
+    ->withTimeout(30)
+    ->withSettings(['max_execution_time' => 25]);
+```
+
+`withCredentials()` sends `X-ClickHouse-User` and `X-ClickHouse-Key` headers, not credentials in the
+URL. `withTimeout()` sets the HTTP read/idle timeout in seconds; ClickHouse's server-side limit is a
+separate setting such as `max_execution_time`. `withSettings()` applies ClickHouse settings to all
+queries from that client. The final `$settings` argument of `fetchAll()`, `fetchRow()`, `fetchOne()`,
+`fetchColumn()`, `write()`, `iterate()`, and `insert()` applies settings to that query.
+
+All requests use Symfony HttpClient. Supply a configured client with `withHttpClient()` for custom
+TLS, proxies, or connection reuse. `withCompression(true)` enables response compression and
+compression of `insert()` bodies. `withSqlLogger()` accepts a PSR logger. `ping(): bool` checks
+availability and returns `false` rather than throwing on a client exception.
+
+### Low-level API
+
+`execute()` returns a `ChcResponse`; `getRaw()`, `getJson()`, and `getJsonData()` provide lower-level
+response access. `getRaw()` accepts a `ChcFormat` case or format string, for example:
+
+```php
+$body = $client->getRaw('SELECT 1', \SevaCode\ClickHouseClient\ChcFormat::JSONEachRow);
+```
+
+`getJsonData()` returns the `data` field from a JSON response. `getLastQueryLatency()` returns the
+last query latency in seconds, or `null` before a query.
 
 ## Query parameters
 
-Values are sent separately from SQL as [server-side query parameters](https://clickhouse.com/docs/en/interfaces/http#cli-queries-with-parameters)
-(`{name:Type}` placeholders), so they are never interpreted as SQL:
-
-````php
-$client = (new ChcClient())
-    ->withCredentials('reader', 'secret') // X-ClickHouse-User / X-ClickHouse-Key headers
-    ->withTimeout(30);                    // HTTP timeout, seconds
-
-$rows = $client->fetchAll(
-    'SELECT * FROM events WHERE user_id = {id:UInt64} AND type IN {types:Array(String)} AND ts >= {from:DateTime}',
-    ['id' => 42, 'types' => ['click', 'view'], 'from' => new DateTimeImmutable('-1 day')],
-);
-$row   = $client->fetchRow('SELECT * FROM users WHERE id = {id:UInt64}', ['id' => 42]);    // array|null
-$count = $client->fetchOne('SELECT count() FROM users WHERE name = {n:String}', ['n' => "O'Reilly"]);
-$ids   = $client->fetchColumn('SELECT id FROM users LIMIT {n:UInt8}', ['n' => 10]);
-
-$writeClient = $client->withReadOnly(ChcReadOnly::Disabled); // or withReadOnly(0)
-$writeClient->write('INSERT INTO users VALUES ({id:UInt64}, {name:String})', ['id' => 43, 'name' => 'Ann']);
-````
-
 ### Typed parameters
 
-Named `ChcParam` factories render their own `{name:Type}` placeholder; the value is sent separately as
-`param_<name>`:
+Named `ChcParam` factories render their own `{name:Type}` placeholder; the value is sent separately
+as `param_<name>`:
 
-````php
+```php
 $id = ChcParam::UInt64(42);
 $types = ChcParam::Array(['click', 'view'], ChcType::String(), 'types');
 $name = ChcParam::String(null, nullable: true);
@@ -61,118 +101,164 @@ $rows = $client->fetchAll(
     "SELECT * FROM events WHERE user_id = $id AND type IN $types AND isNull($name)",
     [$id, $types, $name],
 );
-````
+```
 
-The name is optional; omitted names are generated as `chc_N`. Pass a parameter in a list or under a
-matching string key. Use `nullable: true` for scalar factories or `ChcParam::Nullable($value, $type)`
-for a nullable composite parameter. An unused `ChcParam` throws before the request is sent. Use
-`ChcParam::of($value, $type)` and `ChcType::of()` for other types. `ChcType` is also `Stringable`,
-for example `CAST(x AS $type)`.
+The name can be omitted; auto-generated names have the form `chc_N`. Pass a `ChcParam` in a list
+or under a matching string key. An unused typed parameter, or a string key that does not match its
+name, throws before the request is sent. Use `nullable: true` for scalar factories or
+`ChcParam::Nullable($value, $type)` for an explicitly nullable type. `ChcParam::of($value, $type)`
+and `ChcType::of()` support other types. `ChcType` is `Stringable`, so it can also be used in
+expressions such as `CAST(x AS $type)`.
 
-The last argument of every method is per-query ClickHouse settings, e.g. `['max_execution_time' => 5]`.
-PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside arrays), `DateTimeInterface` →
-`Y-m-d H:i:s[.u]` (pass `'Y-m-d'` strings for `Date`), lists → `Array(...)`, string-keyed arrays → `Map(...)`.
+### Raw server-side parameters
 
-Read queries use POST with SQL in the body and `readonly=2` by default, so they have no URL length limit
-and SQL does not appear in proxy access logs. `withReadOnly()` takes a `ChcReadOnly` case or its integer value:
+Values can also be supplied separately from SQL using ClickHouse
+[server-side query parameters](https://clickhouse.com/docs/en/interfaces/http#cli-queries-with-parameters):
+
+```php
+$rows = $client->fetchAll(
+    'SELECT * FROM events WHERE user_id = {id:UInt64} AND ts >= {from:DateTime}',
+    ['id' => 42, 'from' => new DateTimeImmutable('-1 day')],
+);
+$row = $client->fetchRow('SELECT * FROM users WHERE id = {id:UInt64}', ['id' => 42]);
+$count = $client->fetchOne('SELECT count() FROM users WHERE name = {n:String}', ['n' => "O'Reilly"]);
+$ids = $client->fetchColumn('SELECT id FROM users LIMIT {n:UInt8}', ['n' => 10]);
+```
+
+`fetchRow()` returns the first row or `null`; `fetchOne()` returns the first column of the first row
+or `null`; `fetchColumn()` returns the first column of every row.
+
+PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside arrays),
+`DateTimeInterface` → `Y-m-d H:i:s[.u]` (pass a `'Y-m-d'` string for `Date`), lists → `Array(...)`,
+and string-keyed arrays → `Map(...)`.
+
+## Read-only mode
+
+Queries use HTTP POST with SQL in the request body and `readonly=2` by default. This avoids a query
+URL length limit and keeps SQL out of proxy access logs. `withReadOnly()` accepts a `ChcReadOnly`
+case or integer 0–2:
 
 | Level | `ChcReadOnly` | Meaning |
 |---|---|---|
-| 0 | `Disabled` | writes and DDL allowed; no `readonly` parameter is sent |
-| 1 | `Strict` | reads only, settings cannot be changed; for users whose profile sets `readonly=1` |
-| 2 | `AllowSettings` | default: reads only, `SET`/`SETTINGS` allowed (what ClickHouse applies to HTTP GET) |
+| 0 | `Disabled` | Writes and DDL allowed; no `readonly` parameter is sent |
+| 1 | `Strict` | Reads only; settings cannot be changed. Use for users whose profile sets `readonly=1` |
+| 2 | `AllowSettings` | Default; reads only, `SET`/`SETTINGS` allowed (the level ClickHouse applies to HTTP GET) |
 
-If a user's profile sets `readonly=1`, use `$client = $client->withReadOnly(ChcReadOnly::Strict);`
-(or `$client = $client->withSettings(['readonly' => 1]);`).
+An explicit `readonly` in `withSettings()` or per-query settings takes precedence. For a user profile
+that sets `readonly=1`, use `$client->withReadOnly(ChcReadOnly::Strict)` or
+`$client->withSettings(['readonly' => 1])`.
 See [ClickHouse query permissions](https://clickhouse.com/docs/operations/settings/permissions-for-queries).
 
-## Streaming, inserts, compression, HTTP client
+## Streaming and inserts
 
-````php
-// Rows one by one (FORMAT JSONEachRow): memory does not depend on result size
+`iterate()` yields `FORMAT JSONEachRow` results one row at a time, so memory use does not depend on
+the result size:
+
+```php
 foreach ($client->iterate('SELECT * FROM hits WHERE dt = {dt:Date}', ['dt' => '2024-01-01']) as $row) {
-    // ...
+    // Process each row.
 }
+```
 
-// Streaming insert from an array or a generator; list rows are matched to $columns
-$client = $client->withCompression(true)
-    ->withHttpClient(Symfony\Component\HttpClient\HttpClient::create())
-    ->withPoolConcurrency(8);
+`insert()` consumes an array or iterable such as a generator and sends rows in chunks. Rows may be
+associative arrays; if `$columns` is provided, list rows are matched to those columns by position.
+The table name is written into SQL as an identifier, so do not pass user input:
+
+```php
 $writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
 $writeClient->insert('db.events', $rowsGenerator);
 $writeClient->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
-````
+```
 
-Parallel JSON queries return a `ChcResult` per key, in the order of the input array:
+If ClickHouse reports an error after streaming has begun, rows received before the error may already
+have been yielded before the exception is thrown.
 
-````php
+## Parallel queries
+
+`pool()` sends JSON queries in parallel and returns a `ChcResult` per input key:
+
+```php
 $results = $client->pool(['a' => 'SELECT 1 AS n', 'b' => 'SELECT 2 AS n']);
 $results['a']->data[0]['n']; // 1
 $results['b']->rows;         // also meta, totals, extremes, statistics, queryId, summary
-````
+```
 
-`getJsonPool($queries, $callback)` is deprecated since 2.0 and will be removed in 3.0.
+Results are keyed and ordered like the input array. `withPoolConcurrency()` can limit simultaneous
+requests. `getJsonPool($queries, $callback)` is deprecated since 2.0 and will be removed in 3.0.
 
-Errors that ClickHouse sends in the middle of a stream are thrown as `ChcServerException` after the rows received
-before the error. `insert()` takes the table name as an identifier written into SQL as is — never pass user input.
-All requests use Symfony HttpClient; inject a configured client with `withHttpClient()` when needed.
+## Query id, summary, sessions, retries
 
-## Query id, summary, sessions, retries, errors
+```php
+$client->fetchAll($sql, $params, ['query_id' => 'report-42']); // or let ClickHouse generate one
+$client->getLastQueryId();      // X-ClickHouse-Query-Id from the last successful query
+$client->getLastQuerySummary(); // X-ClickHouse-Summary; values are strings
 
-````php
-$client->fetchAll($sql, $params, ['query_id' => 'report-42']); // or let the server generate one
-$client->getLastQueryId();       // X-ClickHouse-Query-Id — for KILL QUERY / system.query_log
-$client->getLastQuerySummary();  // X-ClickHouse-Summary: ['read_rows' => '10', 'read_bytes' => '80', ...]
+$client = $client->withSession('import-' . bin2hex(random_bytes(8))); // temporary tables and SET
+$client = $client->withRetries(3, 0.5);
+```
 
-$client = $client->withSession('import-' . bin2hex(random_bytes(8))); // temporary tables, SET
-$client = $client->withRetries(3, 0.5); // read-only queries only: connection errors and HTTP 502/503/504
+`withSession()` accepts an optional session timeout as its second argument. Queries sharing a
+session must not run concurrently; ClickHouse may return `SESSION_IS_LOCKED`. `withRetries()` retries
+eligible read-only requests on connection failures and HTTP 502/503/504. Client timeouts, writes,
+and ClickHouse errors are not retried.
+
+## Errors
+
+Catch the specific exception class when handling a particular failure, or catch `ChcException` for
+all client exceptions:
+
+```php
+use SevaCode\ClickHouseClient\ChcException;
+use SevaCode\ClickHouseClient\Exceptions\{
+    ChcClientTimeoutException,
+    ChcConnectionException,
+    ChcHttpException,
+    ChcServerException
+};
 
 try {
     $client->fetchAll('SELECT * FROM missing');
-} catch (ChcClientTimeoutException $e) { // HTTP client timeout (also a ChcConnectionException)
-} catch (ChcConnectionException $e) {     // no HTTP response
-} catch (ChcServerException $e) {         // ClickHouse error; memory/timeout subclasses included
-    $e->getCode();                        // ClickHouse error code, e.g. 60
-} catch (ChcHttpException $e) {           // HTTP status without a ClickHouse error code
+} catch (ChcClientTimeoutException $e) {
+    // HTTP client timeout; also a ChcConnectionException.
+} catch (ChcConnectionException $e) {
+    // No complete HTTP response (connect failure, broken connection).
+} catch (ChcServerException $e) {
+    // ClickHouse error; memory-limit and server-timeout subclasses are included.
+    $e->getCode(); // ClickHouse error code, e.g. 60.
+} catch (ChcHttpException $e) {
+    // HTTP status without a ClickHouse error code.
     $e->getHttpStatus();
 } catch (ChcException $e) {
-    $e->getClickHouseErrorCode();  // 60 — ClickHouse error code, null if not a ClickHouse error
-    $e->getHttpStatus();           // 404 — HTTP status, null if there was no response
-    $e->getCode();                 // ClickHouse error code or 0, never the HTTP status
+    $e->getClickHouseErrorCode(); // null when this is not a ClickHouse error.
+    $e->getHttpStatus();          // null when there was no HTTP response.
+    $e->getCode();                // ClickHouse code or 0, never the HTTP status.
 }
-````
+```
 
-`ChcTimeoutExceededException` is reserved for server-side error 159; HTTP client timeouts use
-`ChcClientTimeoutException`. `catch (ChcException)` still catches all client exceptions.
-`isAlive()` remains as a deprecated alias for the non-throwing `ping()` and will be removed in 3.0.
+`ChcTimeoutExceededException` represents server-side ClickHouse error 159; HTTP client timeouts use
+`ChcClientTimeoutException`. `ChcMemoryLimitExceededException` represents server error 241.
+`ChcException` also covers errors such as malformed successful responses. `isAlive()` is a deprecated
+alias for non-throwing `ping()` and will be removed in 3.0.
 
-Notes:
-- With `FORMAT JSON` ClickHouse returns `UInt64`/`Int64` as strings by default
-  (`output_format_json_quote_64bit_integers`; newer servers may differ). Set it explicitly if you rely on the type:
-  `$client = $client->withSettings(['output_format_json_quote_64bit_integers' => 0])`.
-- An error that happens after ClickHouse started streaming the result comes with HTTP 200 and is appended
-  to the body; the client detects it and throws `ChcException`. With `wait_end_of_query=1` the server buffers
-  the result and reports such errors with a proper HTTP status, and `getLastQuerySummary()` is complete —
-  at the cost of memory/latency on the server.
+## Notes
 
-# Install through [Composer](https://getcomposer.org/)
-````json
-"require": {
-    "seva-code/php-click-house-client": "^2.0"
-}
-````
+- With `FORMAT JSON`, ClickHouse returns `UInt64`/`Int64` as strings by default
+  (`output_format_json_quote_64bit_integers`; newer servers may differ). Set it explicitly if you
+  rely on the type: `$client->withSettings(['output_format_json_quote_64bit_integers' => 0])`.
+- An error after ClickHouse starts streaming a result can arrive in the body with HTTP 200. The
+  client detects the appended error and throws an exception. With `wait_end_of_query=1`, the server
+  buffers the result and reports such errors with an HTTP error status; the query summary is
+  complete, at the cost of server memory and latency.
 
-# Development
+## Development
 
-Documentation for contributors lives in [`docs/`](docs/README.md):
-the [roadmap](docs/roadmap/ROADMAP.md) and [architecture decision records](docs/adr/).
-
-## Tests
+Contributor documentation lives in [`docs/`](docs/README.md), including the
+[roadmap](docs/roadmap/ROADMAP.md) and [architecture decision records](docs/adr/).
 
 ```bash
 composer install
-composer test                 # unit tests
-composer phpstan              # static analysis
+composer test       # unit tests
+composer phpstan    # static analysis
 ```
 
 Integration tests run against a real ClickHouse server:
@@ -182,4 +268,4 @@ docker run -d -p 8123:8123 -e CLICKHOUSE_SKIP_USER_SETUP=1 clickhouse/clickhouse
 CLICKHOUSE_URL=http://localhost:8123/ composer test-integration
 ```
 
-Optional `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` are passed to the client.
+Optional `CLICKHOUSE_USER` and `CLICKHOUSE_PASSWORD` environment variables are passed to the client.
