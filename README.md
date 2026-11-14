@@ -140,7 +140,7 @@ Notes:
 # Install through [Composer](https://getcomposer.org/)
 ````json
 "require": {
-    "seva-code/php-click-house-client": "1.3.x-dev"
+    "seva-code/php-click-house-client": "^1.4"
 }
 ````
 
