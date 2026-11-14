@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\Exceptions\ChcConnectionException;
@@ -37,10 +38,10 @@ class DriverFeaturesTest extends IntegrationTestCase
         $client->fetchAll('SELECT 1', [], ['query_id' => 'chc-it-' . ($id = bin2hex(random_bytes(4)))]);
         $this->assertSame("chc-it-$id", $client->getLastQueryId());
 
-        $client = $client->withSession('chc-it-' . bin2hex(random_bytes(4)))->withReadOnly(0);
+        $client = $client->withSession('chc-it-' . bin2hex(random_bytes(4)))->withReadOnly(ChcReadOnly::Disabled);
         $client->write('CREATE TEMPORARY TABLE tmp (x UInt8)');
         $client->write('INSERT INTO tmp VALUES (7)');
-        $client = $client->withReadOnly(2);
+        $client = $client->withReadOnly(ChcReadOnly::AllowSettings);
         $this->assertSame(7, $client->fetchOne('SELECT x FROM tmp'));
         foreach ($client->iterate('SELECT x FROM tmp') as $row) {
             $this->assertSame(['x' => 7], $row);

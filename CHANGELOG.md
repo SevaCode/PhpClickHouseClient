@@ -17,7 +17,8 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 - `ChcFormat` is a backed enum; format arguments accept `ChcFormat|string|null`.
 - `ChcClient` configuration uses immutable `withX()` methods; assign each returned client.
 - Non-ping queries use POST with SQL in the body and `Content-Type: text/plain; charset=UTF-8`;
-  the default read-only level is `2`, configurable with `withReadOnly(0|1|2)`.
+  the default read-only level is `2`, configurable with `withReadOnly(ChcReadOnly|int)`;
+  `ChcReadOnly` enum: `Disabled` (0), `Strict` (1), `AllowSettings` (2).
 
 ## [1.4]
 

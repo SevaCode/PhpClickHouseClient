@@ -44,7 +44,7 @@ $row   = $client->fetchRow('SELECT * FROM users WHERE id = {id:UInt64}', ['id' =
 $count = $client->fetchOne('SELECT count() FROM users WHERE name = {n:String}', ['n' => "O'Reilly"]);
 $ids   = $client->fetchColumn('SELECT id FROM users LIMIT {n:UInt8}', ['n' => 10]);
 
-$writeClient = $client->withReadOnly(0);
+$writeClient = $client->withReadOnly(ChcReadOnly::Disabled); // or withReadOnly(0)
 $writeClient->write('INSERT INTO users VALUES ({id:UInt64}, {name:String})', ['id' => 43, 'name' => 'Ann']);
 ````
 
@@ -53,8 +53,17 @@ PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside 
 `Y-m-d H:i:s[.u]` (pass `'Y-m-d'` strings for `Date`), lists → `Array(...)`, string-keyed arrays → `Map(...)`.
 
 Read queries use POST with SQL in the body and `readonly=2` by default, so they have no URL length limit
-and SQL does not appear in proxy access logs. If a user's profile sets `readonly=1`, use
-`$client = $client->withReadOnly(1);` (or `$client = $client->withSettings(['readonly' => 1]);`).
+and SQL does not appear in proxy access logs. `withReadOnly()` takes a `ChcReadOnly` case or its integer value:
+
+| Level | `ChcReadOnly` | Meaning |
+|---|---|---|
+| 0 | `Disabled` | writes and DDL allowed; no `readonly` parameter is sent |
+| 1 | `Strict` | reads only, settings cannot be changed; for users whose profile sets `readonly=1` |
+| 2 | `AllowSettings` | default: reads only, `SET`/`SETTINGS` allowed (what ClickHouse applies to HTTP GET) |
+
+If a user's profile sets `readonly=1`, use `$client = $client->withReadOnly(ChcReadOnly::Strict);`
+(or `$client = $client->withSettings(['readonly' => 1]);`).
+See [ClickHouse query permissions](https://clickhouse.com/docs/operations/settings/permissions-for-queries).
 
 ## Streaming, inserts, compression, HTTP client
 
@@ -68,7 +77,7 @@ foreach ($client->iterate('SELECT * FROM hits WHERE dt = {dt:Date}', ['dt' => '2
 $client = $client->withCompression(true)
     ->withHttpClient(Symfony\Component\HttpClient\HttpClient::create())
     ->withPoolConcurrency(8);
-$writeClient = $client->withReadOnly(0);
+$writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
 $writeClient->insert('db.events', $rowsGenerator);
 $writeClient->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
 ````

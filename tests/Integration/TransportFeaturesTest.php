@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
 use Symfony\Component\HttpClient\HttpClient;
@@ -81,10 +82,10 @@ class TransportFeaturesTest extends IntegrationTestCase
         $client = $client->withCompression($compression);
         $table = 'chc_it_' . bin2hex(random_bytes(4));
 
-        $writeClient = $client->withReadOnly(0);
+        $writeClient = $client->withReadOnly(ChcReadOnly::Disabled);
         $writeClient->write("CREATE TABLE $table (id UInt32, s String, d DateTime, a Array(String)) ENGINE = Memory");
         try {
-            $client = $client->withReadOnly(2);
+            $client = $client->withReadOnly(ChcReadOnly::AllowSettings);
             $e = $this->caughtException(fn() => $client->insert($table, [['id' => 1, 's' => 'x', 'd' => '2024-01-01 00:00:00', 'a' => []]]), ChcException::class);
             $this->assertSame(164, $e->getCode()); // READONLY
 

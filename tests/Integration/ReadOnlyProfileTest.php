@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Integration;
 
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
 
@@ -14,7 +15,7 @@ class ReadOnlyProfileTest extends IntegrationTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->admin = $this->client()->withReadOnly(0);
+        $this->admin = $this->client()->withReadOnly(ChcReadOnly::Disabled);
 
         try {
             $this->admin->execute('CREATE SETTINGS PROFILE IF NOT EXISTS chc_ro_profile SETTINGS readonly = 1');
@@ -41,7 +42,7 @@ class ReadOnlyProfileTest extends IntegrationTestCase
         );
         $this->assertSame(164, $exception->getClickHouseErrorCode());
 
-        $this->assertSame(1, $client->withReadOnly(1)->fetchOne('SELECT 1'));
+        $this->assertSame(1, $client->withReadOnly(ChcReadOnly::Strict)->fetchOne('SELECT 1'));
         $this->assertSame(1, $client->withSettings(['readonly' => 1])->fetchOne('SELECT 1'));
     }
 

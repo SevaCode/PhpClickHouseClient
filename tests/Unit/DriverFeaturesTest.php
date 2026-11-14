@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcException;
 use SevaCode\ClickHouseClient\ChcFormat;
@@ -146,7 +147,7 @@ class DriverFeaturesTest extends TestCase
         // Not retried: write
         $requests = [];
         $client = $this->client($requests, [new MockResponse('', ['http_code' => 503]), new MockResponse('ok')]);
-        $client = $client->withRetries(3, 0)->withReadOnly(0);
+        $client = $client->withRetries(3, 0)->withReadOnly(ChcReadOnly::Disabled);
         $this->caughtException(fn() => $client->execute('INSERT INTO t VALUES (1)'), ChcException::class);
         $this->assertCount(1, $requests);
 

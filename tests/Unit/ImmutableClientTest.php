@@ -6,6 +6,7 @@ namespace SevaCode\ClickHouseClient\Tests\Unit;
 
 use SevaCode\ClickHouseClient\ChcClient;
 use SevaCode\ClickHouseClient\ChcFormat;
+use SevaCode\ClickHouseClient\ChcReadOnly;
 use SevaCode\ClickHouseClient\ChcRequest;
 use SevaCode\ClickHouseClient\Tests\TestCase;
 use SevaCode\ClickHouseClient\Transports\ChcSymfonyCurlTransport;
@@ -34,14 +35,15 @@ class ImmutableClientTest extends TestCase
         $client = $this->client($requests, [new MockResponse('ok'), new MockResponse('ok')]);
         $withDatabase = $client->withDatabase('analytics');
         $withSettings = $withDatabase->withSettings(['max_threads' => 3]);
-        $configured = $withSettings->withReadOnly(1);
+        $configured = $withSettings->withReadOnly(ChcReadOnly::Strict);
 
         $this->assertNotSame($client, $withDatabase);
         $this->assertNotSame($withDatabase, $withSettings);
         $this->assertNotSame($withSettings, $configured);
         $this->assertNotSame($client, $configured);
-        $this->assertSame(2, $client->getReadOnly());
-        $this->assertSame(1, $configured->getReadOnly());
+        $this->assertSame(ChcReadOnly::AllowSettings, $client->getReadOnly());
+        $this->assertSame(ChcReadOnly::Strict, $configured->getReadOnly());
+        $this->assertSame(ChcReadOnly::Strict, $client->withReadOnly(1)->getReadOnly());
         $client->getRaw('SELECT 1');
         $configured->getRaw('SELECT 1');
 
@@ -79,12 +81,18 @@ class ImmutableClientTest extends TestCase
             new MockResponse('1'),
             new MockResponse('1'),
             new MockResponse('1'),
+            new MockResponse('1'),
+            new MockResponse('1'),
+            new MockResponse('1'),
         ]);
 
         $client->getRaw('SELECT 1');
+        $client->withReadOnly(ChcReadOnly::Strict)->getRaw('SELECT 1');
+        $client->withReadOnly(ChcReadOnly::Disabled)->getRaw('SELECT 1');
+        $client->withSettings(['readonly' => 1])->getRaw('SELECT 1');
+        $client->withReadOnly(ChcReadOnly::Strict)->withReadOnly(2)->getRaw('SELECT 1');
         $client->withReadOnly(1)->getRaw('SELECT 1');
         $client->withReadOnly(0)->getRaw('SELECT 1');
-        $client->withSettings(['readonly' => 1])->getRaw('SELECT 1');
 
         $queries = [];
         foreach ($requests as [, $url]) {
@@ -96,6 +104,9 @@ class ImmutableClientTest extends TestCase
             ['readonly' => '1'],
             [],
             ['readonly' => '1'],
+            ['readonly' => '2'],
+            ['readonly' => '1'],
+            [],
         ], $queries);
         foreach ($requests as [$method, , $options]) {
             $this->assertSame('POST', $method);
