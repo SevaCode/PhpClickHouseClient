@@ -324,9 +324,10 @@ class ChcClient
     }
 
     /**
+     * In 2.0 returns false instead of throwing; use isAlive() for a non-throwing check now.
+     *
      * @return bool
      * @throws ChcException when the server is unreachable
-     * In 2.0 returns false instead of throwing; use isAlive() for a non-throwing check now.
      */
     public function ping()
     {
@@ -448,10 +449,11 @@ class ChcClient
      * Sends all queries to ClickHouse in parallel and passes each JSON response
      * through $callback. The returned array is keyed by the original $queries keys.
      *
+     * In 2.0 replaced by pool() returning result objects.
+     *
      * @param array<string> $queries
      * @param callable(array $data, array $meta, int $rows, ?int $rows_before_limit_at_least, ?array $statistics, ?array $totals, mixed $extremes, float $start_time): mixed $callback
      * @return array
-     * In 2.0 replaced by pool() returning result objects.
      */
     public function getJsonPool(array $queries, callable $callback): array
     {
