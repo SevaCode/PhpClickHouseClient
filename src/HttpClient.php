@@ -7,7 +7,7 @@
 namespace SevaCode\ClickHouseClient;
 
 /**
- * @deprecated use ChcClient
+ * @deprecated since 1.4, removed in 2.0. Use ChcClient.
  */
 class HttpClient extends ChcClient
 {

@@ -7,7 +7,7 @@
 namespace SevaCode\ClickHouseClient;
 
 /**
- * @deprecated 
+ * @deprecated since 1.4, removed in 2.0. Use ChcClient::readOnly().
  */
 class Mode
 {

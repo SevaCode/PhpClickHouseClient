@@ -96,6 +96,7 @@ class ChcClient
      * Opt-in: send read-only queries by POST with readonly=2 instead of GET.
      * The server applies readonly=2 to GET requests itself, so the guarantees are the same,
      * but SQL is not put into the URL (no URL length limit, no SQL in proxy access logs).
+     * @deprecated since 1.4: in 2.0 reads always use POST + readonly=2 and this method is removed.
      */
     public function setReadOnlyOverPost(bool $enabled): void
     {
@@ -325,6 +326,7 @@ class ChcClient
     /**
      * @return bool
      * @throws ChcException when the server is unreachable
+     * In 2.0 returns false instead of throwing; use isAlive() for a non-throwing check now.
      */
     public function ping()
     {
@@ -449,6 +451,7 @@ class ChcClient
      * @param array<string> $queries
      * @param callable(array $data, array $meta, int $rows, ?int $rows_before_limit_at_least, ?array $statistics, ?array $totals, mixed $extremes, float $start_time): mixed $callback
      * @return array
+     * In 2.0 replaced by pool() returning result objects.
      */
     public function getJsonPool(array $queries, callable $callback): array
     {
