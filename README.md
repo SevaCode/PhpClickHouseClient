@@ -18,7 +18,6 @@ if (!$client->isAlive()) { // ping() throws ChcException when the server is unre
 }
 
 try {
-    $client->readOnly(true);
     $result = $client->getRaw($query, ChcFormat::JSONEachRow);
 }
 catch (ChcException $e) {
@@ -33,9 +32,9 @@ Values are sent separately from SQL as [server-side query parameters](https://cl
 (`{name:Type}` placeholders), so they are never interpreted as SQL:
 
 ````php
-$client = new ChcClient();
-$client->setCredentials('reader', 'secret'); // X-ClickHouse-User / X-ClickHouse-Key headers
-$client->setTimeout(30);                     // HTTP timeout, seconds
+$client = (new ChcClient())
+    ->withCredentials('reader', 'secret') // X-ClickHouse-User / X-ClickHouse-Key headers
+    ->withTimeout(30);                    // HTTP timeout, seconds
 
 $rows = $client->fetchAll(
     'SELECT * FROM events WHERE user_id = {id:UInt64} AND type IN {types:Array(String)} AND ts >= {from:DateTime}',
@@ -45,16 +44,17 @@ $row   = $client->fetchRow('SELECT * FROM users WHERE id = {id:UInt64}', ['id' =
 $count = $client->fetchOne('SELECT count() FROM users WHERE name = {n:String}', ['n' => "O'Reilly"]);
 $ids   = $client->fetchColumn('SELECT id FROM users LIMIT {n:UInt8}', ['n' => 10]);
 
-$client->readOnly(false);
-$client->write('INSERT INTO users VALUES ({id:UInt64}, {name:String})', ['id' => 43, 'name' => 'Ann']);
+$writeClient = $client->withReadOnly(0);
+$writeClient->write('INSERT INTO users VALUES ({id:UInt64}, {name:String})', ['id' => 43, 'name' => 'Ann']);
 ````
 
 The last argument of every method is per-query ClickHouse settings, e.g. `['max_execution_time' => 5]`.
 PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside arrays), `DateTimeInterface` →
 `Y-m-d H:i:s[.u]` (pass `'Y-m-d'` strings for `Date`), lists → `Array(...)`, string-keyed arrays → `Map(...)`.
 
-Read-only queries are sent with GET by default. `$client->setReadOnlyOverPost(true)` sends them with POST and
-`readonly=2` instead, so long SQL does not hit URL length limits and does not end up in proxy access logs.
+Read queries use POST with SQL in the body and `readonly=2` by default, so they have no URL length limit
+and SQL does not appear in proxy access logs. If a user's profile sets `readonly=1`, use
+`$client = $client->withReadOnly(1);` (or `$client = $client->withSettings(['readonly' => 1]);`).
 
 ## Streaming, inserts, compression, HTTP client
 
@@ -65,18 +65,17 @@ foreach ($client->iterate('SELECT * FROM hits WHERE dt = {dt:Date}', ['dt' => '2
 }
 
 // Streaming insert from an array or a generator; list rows are matched to $columns
-$client->readOnly(false);
-$client->insert('db.events', $rowsGenerator);
-$client->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
-
-$client->setCompression(true);                              // gzip responses and insert bodies
-$client->setHttpClient(Symfony\Component\HttpClient\HttpClient::create()); // keep-alive, proxies, custom TLS
-$client->setPoolConcurrency(8);                             // getJsonPool(): at most 8 requests at once
+$client = $client->withCompression(true)
+    ->withHttpClient(Symfony\Component\HttpClient\HttpClient::create())
+    ->withPoolConcurrency(8);
+$writeClient = $client->withReadOnly(0);
+$writeClient->insert('db.events', $rowsGenerator);
+$writeClient->insert('db.events', [[1, 'click'], [2, 'view']], ['id', 'type']);
 ````
 
 Errors that ClickHouse sends in the middle of a stream are thrown as `ChcException` after the rows received
 before the error. `insert()` takes the table name as an identifier written into SQL as is — never pass user input.
-All requests use Symfony HttpClient; inject a configured client with `setHttpClient()` when needed.
+All requests use Symfony HttpClient; inject a configured client with `withHttpClient()` when needed.
 
 ## Query id, summary, sessions, retries, errors
 
@@ -85,8 +84,8 @@ $client->fetchAll($sql, $params, ['query_id' => 'report-42']); // or let the ser
 $client->getLastQueryId();       // X-ClickHouse-Query-Id — for KILL QUERY / system.query_log
 $client->getLastQuerySummary();  // X-ClickHouse-Summary: ['read_rows' => '10', 'read_bytes' => '80', ...]
 
-$client->setSessionId('import-' . bin2hex(random_bytes(8))); // temporary tables, SET
-$client->setRetries(3, 0.5); // read-only queries only: connection errors and HTTP 502/503/504
+$client = $client->withSession('import-' . bin2hex(random_bytes(8))); // temporary tables, SET
+$client = $client->withRetries(3, 0.5); // read-only queries only: connection errors and HTTP 502/503/504
 
 try {
     $client->fetchAll('SELECT * FROM missing');
@@ -101,7 +100,7 @@ try {
 Notes:
 - With `FORMAT JSON` ClickHouse returns `UInt64`/`Int64` as strings by default
   (`output_format_json_quote_64bit_integers`; newer servers may differ). Set it explicitly if you rely on the type:
-  `addSettings(['output_format_json_quote_64bit_integers' => 0])`.
+  `$client = $client->withSettings(['output_format_json_quote_64bit_integers' => 0])`.
 - An error that happens after ClickHouse started streaming the result comes with HTTP 200 and is appended
   to the body; the client detects it and throws `ChcException`. With `wait_end_of_query=1` the server buffers
   the result and reports such errors with a proper HTTP status, and `getLastQuerySummary()` is complete —

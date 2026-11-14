@@ -13,7 +13,7 @@ final class ChcHttpRequest
 {
     /**
      * @param string $path '' for queries, 'ping' for ping
-     * @param array<string, mixed> $query URL query parameters (ClickHouse settings, param_*, query for GET)
+     * @param array<string, mixed> $query URL query parameters (ClickHouse settings and insert query)
      * @param array<string, string> $headers
      */
     public function __construct(

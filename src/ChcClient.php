@@ -28,14 +28,13 @@ class ChcClient
         //'max_rows_to_group_by' => 2000000,
     ];
 
-    protected bool $isReadOnly = true;
+    protected int $readOnlyLevel = 2;
 
     /** Query latency in seconds. */
     protected ?float $last_query_latency = null;
 
     private ?LoggerInterface $sqlLogger = null;
     private ?float $timeout = null;
-    private bool $readOnlyOverPost = false;
     private bool $compression = false;
     private ?HttpClientInterface $httpClient = null;
     private ?HttpClientInterface $defaultHttpClient = null;
@@ -45,54 +44,78 @@ class ChcClient
     /** @var string[]|null */
     private ?array $lastHeaderLines = null;
 
-    public function readOnly(?bool $isReadOnly = null): bool
-    {
-        $old = $this->isReadOnly;
-
-        if (null !== $isReadOnly) {
-            $this->isReadOnly = $isReadOnly;
-        }
-
-        return $old;
+    public function __construct(
+        string $url = 'http://localhost:8123/',
+        ?HttpClientInterface $httpClient = null,
+    ) {
+        $this->url = $url;
+        $this->httpClient = $httpClient;
     }
 
-    public function setDatabase(string $database): void
+    public function __clone()
     {
-        $this->settings['database'] = $database;
+        $this->lastHeaderLines = null;
+        $this->last_query_latency = null;
     }
 
-    public function addSettings(array $settings): void
+    public function withUrl(string $url): static
     {
-        $this->settings = array_merge($this->settings, $settings);
+        $clone = clone $this;
+        $clone->url = $url;
+        $clone->defaultHttpClient = null;
+        return $clone;
+    }
+
+    public function withDatabase(string $database): static
+    {
+        $clone = clone $this;
+        $clone->settings['database'] = $database;
+        return $clone;
+    }
+
+    public function withSettings(array $settings): static
+    {
+        $clone = clone $this;
+        $clone->settings = array_merge($clone->settings, $settings);
+        return $clone;
     }
 
     /**
      * Credentials are sent in X-ClickHouse-User / X-ClickHouse-Key headers,
-     * never in the URL. Same as addSettings(['user' => ..., 'password' => ...]).
+     * never in the URL. Same as withSettings(['user' => ..., 'password' => ...]).
      */
-    public function setCredentials(?string $user, ?string $password = null): void
+    public function withCredentials(?string $user, ?string $password = null): static
     {
-        $this->settings['user'] = $user;
-        $this->settings['password'] = $password;
+        $clone = clone $this;
+        $clone->settings['user'] = $user;
+        $clone->settings['password'] = $password;
+        return $clone;
     }
 
     /**
      * HTTP read/idle timeout in seconds; null — transport default.
-     * Server-side limit is a separate setting: addSettings(['max_execution_time' => N]).
+     * Server-side limit is a separate setting: withSettings(['max_execution_time' => N]).
      */
-    public function setTimeout(?float $seconds): void
+    public function withTimeout(?float $seconds): static
     {
-        $this->timeout = $seconds;
+        $clone = clone $this;
+        $clone->timeout = $seconds;
+        return $clone;
     }
 
-    /**
-     * Opt-in: send read-only queries by POST with readonly=2 instead of GET.
-     * The server applies readonly=2 to GET requests itself, so the guarantees are the same,
-     * but SQL is not put into the URL (no URL length limit, no SQL in proxy access logs).
-     */
-    public function setReadOnlyOverPost(bool $enabled): void
+    public function withReadOnly(int $level): static
     {
-        $this->readOnlyOverPost = $enabled;
+        if (!in_array($level, [0, 1, 2], true)) {
+            throw new \InvalidArgumentException('Read-only level must be 0, 1 or 2');
+        }
+        $clone = clone $this;
+        $clone->readOnlyLevel = $level;
+        return $clone;
+    }
+
+    public function getReadOnly(): int
+    {
+        return $this->readOnlyLevel;
     }
 
     /**
@@ -100,56 +123,73 @@ class ChcClient
      * proxies, custom TLS, retries, test doubles). The default is a shared HttpClient::create()
      * client. The client's base_uri is set to the client URL.
      */
-    public function setHttpClient(?HttpClientInterface $httpClient): void
+    public function withHttpClient(?HttpClientInterface $httpClient): static
     {
-        $this->httpClient = $httpClient;
+        $clone = clone $this;
+        $clone->httpClient = $httpClient;
+        return $clone;
     }
 
     /**
      * Opt-in gzip compression of responses (enable_http_compression=1) and of insert() bodies.
      */
-    public function setCompression(bool $enabled): void
+    public function withCompression(bool $enabled): static
     {
-        $this->compression = $enabled;
+        $clone = clone $this;
+        $clone->compression = $enabled;
+        return $clone;
     }
 
     /**
      * Max number of simultaneous requests in getJsonPool(); null — all at once (as before).
      */
-    public function setPoolConcurrency(?int $concurrency): void
+    public function withPoolConcurrency(?int $concurrency): static
     {
         if (null !== $concurrency && $concurrency < 1) {
             throw new \InvalidArgumentException('Pool concurrency must be >= 1');
         }
-        $this->poolConcurrency = $concurrency;
+        $clone = clone $this;
+        $clone->poolConcurrency = $concurrency;
+        return $clone;
     }
 
     /**
      * Opt-in retries of read-only queries on connection errors and HTTP 502/503/504.
-     * Writes (readOnly(false), insert()), timeouts and ClickHouse errors are never retried.
+     * Writes (withReadOnly(0), insert()), timeouts and ClickHouse errors are never retried.
      */
-    public function setRetries(int $count, float $delaySeconds = 0.5): void
+    public function withRetries(int $count, float $delaySeconds = 0.5): static
     {
         if ($count < 0 || $delaySeconds < 0) {
             throw new \InvalidArgumentException('Retries and delay must be >= 0');
         }
-        $this->retries = $count;
-        $this->retryDelay = $delaySeconds;
+        $clone = clone $this;
+        $clone->retries = $count;
+        $clone->retryDelay = $delaySeconds;
+        return $clone;
     }
 
     /**
      * ClickHouse session (session_id) for temporary tables and SET; null — no session.
      * Queries of one session must not run concurrently (getJsonPool() fails with SESSION_IS_LOCKED).
      */
-    public function setSessionId(?string $sessionId, ?int $timeoutSeconds = null): void
+    public function withSession(?string $sessionId, ?int $timeoutSeconds = null): static
     {
-        unset($this->settings['session_id'], $this->settings['session_timeout']);
+        $clone = clone $this;
+        unset($clone->settings['session_id'], $clone->settings['session_timeout']);
         if (null !== $sessionId) {
-            $this->settings['session_id'] = $sessionId;
+            $clone->settings['session_id'] = $sessionId;
             if (null !== $timeoutSeconds) {
-                $this->settings['session_timeout'] = $timeoutSeconds;
+                $clone->settings['session_timeout'] = $timeoutSeconds;
             }
         }
+        return $clone;
+    }
+
+    public function withSqlLogger(?LoggerInterface $sqlLogger): static
+    {
+        $clone = clone $this;
+        $clone->sqlLogger = $sqlLogger;
+        return $clone;
     }
 
     /**
@@ -182,12 +222,6 @@ class ChcClient
         }
     }
 
-    public function setUrl(string $url): void
-    {
-        $this->url = $url;
-        $this->defaultHttpClient = null;
-    }
-
     /**
      * Query latency in seconds; null before the first query.
      */
@@ -212,7 +246,7 @@ class ChcClient
     protected function runRequest(ChcRequest $request): ChcResponse
     {
         $this->lastHeaderLines = null;
-        $response = $this->withRetries(fn() => $this->sendRequest($request));
+        $response = $this->runWithRetries(fn() => $this->sendRequest($request));
         $this->lastHeaderLines = $response->getHeaderLines();
         return $response;
     }
@@ -235,13 +269,13 @@ class ChcClient
      * @param callable(): T $send
      * @return T
      */
-    private function withRetries(callable $send): mixed
+    private function runWithRetries(callable $send): mixed
     {
         for ($attempt = 0; ; $attempt++) {
             try {
                 return $send();
             } catch (ChcException $e) {
-                $retryable = $this->isReadOnly
+                $retryable = $this->readOnlyLevel > 0
                     && ($e instanceof ChcConnectionException || in_array($e->getHttpStatus(), [502, 503, 504], true));
                 if (!$retryable || $attempt >= $this->retries) {
                     throw $e;
@@ -360,7 +394,7 @@ class ChcClient
 
     /**
      * DDL/DML (CREATE, INSERT ... VALUES, ALTER ...) with query parameters.
-     * Honours readOnly(): call readOnly(false) first, as for execute().
+     * Honours read-only mode: use withReadOnly(0) to allow writes.
      *
      * @param array<string, mixed> $params
      * @param array<string, mixed> $settings
@@ -491,7 +525,7 @@ class ChcClient
 
         try {
             $this->lastHeaderLines = null;
-            $response = $this->withRetries(function () use ($transport, $request) {
+            $response = $this->runWithRetries(function () use ($transport, $request) {
                 try {
                     $response = $transport->request($request);
                     if (200 !== $response->getStatusCode()) {
@@ -522,7 +556,7 @@ class ChcClient
      * Streaming insert: INSERT INTO $table [($columns)] FORMAT JSONEachRow, the body is sent in chunks
      * while $rows (array or generator) is consumed. Rows are associative arrays; with $columns
      * given, list rows are matched to $columns by position.
-     * Honours readOnly(): in read-only mode the server rejects the insert (READONLY).
+     * Honours read-only mode: use withReadOnly(0) to allow inserts.
      *
      * $table is an identifier written into SQL as is (e.g. 'db.events') — never pass user input.
      *
@@ -544,8 +578,8 @@ class ChcClient
         $this->logSql($sql);
 
         $settings = array_merge($this->settings, $settings);
-        if ($this->isReadOnly && !isset($settings['readonly'])) {
-            $settings['readonly'] = 2;
+        if ($this->readOnlyLevel > 0 && !array_key_exists('readonly', $settings)) {
+            $settings['readonly'] = $this->readOnlyLevel;
         }
         $request = (new ChcRequest)->setSettings($settings)->setQuery($sql)->setReturnFormat(null);
 
@@ -566,8 +600,7 @@ class ChcClient
     private function symfonyTransport(): ChcSymfonyCurlTransport
     {
         $transport = (new ChcSymfonyCurlTransport($this->httpClient ?? ($this->defaultHttpClient ??= $this->createHttpClient())))
-            ->setReadOnly($this->isReadOnly)
-            ->setReadOnlyOverPost($this->readOnlyOverPost)
+            ->setReadOnlyLevel($this->readOnlyLevel)
             ->setCompression($this->compression)
             ->setTimeout($this->timeout);
         if (null !== $this->httpClient) {
@@ -584,11 +617,6 @@ class ChcClient
         return SymfonyHttpClient::create([
             'base_uri' => $this->url,
         ]);
-    }
-
-    public function setSqlLogger(?LoggerInterface $sqlLogger): void
-    {
-        $this->sqlLogger = $sqlLogger;
     }
 
     private function logSql(string $query): void

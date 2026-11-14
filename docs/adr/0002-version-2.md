@@ -27,13 +27,17 @@ Composer не обновит пользователей с `^1.x` до 2.0 са�
 | 2 | Единственный транспорт — Symfony HttpClient; удалить `ChcHttpTransport` (`file_get_contents`) | Один путь кода; keep-alive, потоковое чтение, таймауты везде одинаковые | Нет, если не использовали транспорт напрямую | да | **принято** |
 | 3 | `declare(strict_types=1)`, типы у всех параметров, возвращаемых значений и свойств | Ошибки ловятся статическим анализом и IDE | Передавать правильные типы (например, `int` вместо `'5'`) | да | **принято** |
 | 4 | `ChcFormat` → `enum ChcFormat: string` | Опечатка в формате невозможна | `ChcFormat::JSON` не меняется; строки `'JSON'` → enum | да | **принято** |
-| 5 | Иммутабельный клиент: `with*()` возвращают копию, `readOnly()`/`addSettings()`/`set*()` удаляются | Нет общего изменяемого состояния в DI и долгоживущих воркерах (RoadRunner, Swoole) | `$c->readOnly(false)` → `$c = $c->withReadOnly(false)` | да | **принято** |
-| 6 | Чтение по умолчанию через POST + `readonly=2`, тело — `Content-Type: text/plain` | Нет лимита длины URL и SQL в access-логах; честный `Content-Type` | Нет (поведение сервера то же) | да | **принято** |
+| 5 | Иммутабельный клиент: `with*()` возвращают копию, `readOnly()`/`addSettings()`/`set*()` удаляются | Нет общего изменяемого состояния в DI и долгоживущих воркерах (RoadRunner, Swoole) | `$c->readOnly(false)` → `$c = $c->withReadOnly(0)`; чтение уровня → `getReadOnly()` | да | **принято** |
+| 6 | Чтение по умолчанию через POST + `readonly=2`, тело — `Content-Type: text/plain` | Нет лимита длины URL и SQL в access-логах; честный `Content-Type` | Для профиля `readonly=1`: `$c = $c->withReadOnly(1)` | да | **принято** |
 | 7 | `ping(): bool` без исключений (сливается с `isAlive()`) | Ожидаемое поведение, пример в README был неверным | Убрать `try/catch` вокруг `ping()` | да | **принято** |
 | 8 | Иерархия исключений: `ChcServerException` (есть код ошибки ClickHouse), `ChcConnectionException`, `ChcTimeoutExceededException`, `ChcMemoryLimitExceededException`; `getCode()` = код ошибки ClickHouse или 0 | Различать ошибки сервера, сети и HTTP без разбора текста | `catch (ChcException)` работает; кто читал HTTP-статус из `getCode()` → `getHttpStatus()` | да | **принято** |
 | 9 | `getJsonPool()` → `pool(array $queries): array<key, ChcResult>` вместо callback с 8 позиционными аргументами | Читаемо и типизировано | Переписать callback на чтение полей результата | да | **принято** |
 | 10 | Минимум PHP 8.3 и Symfony `^6.4 \|\| ^7.0` | PHP 8.1 и 8.2 вне активной поддержки, Symfony 6.4 — LTS | Обновить PHP | да (или сразу 8.3) | **принято** |
 | 11 | Переименовать классы без префикса `Chc` (`Client`, `Format`, …) | Префикс избыточен при наличии namespace | Переименования во всём коде пользователя | **нет**: дорогая миграция ради косметики | **отклонено** |
+
+Для пользователей с профилем `readonly = 1` запрос с `readonly=2` приводит к Code 164
+(`Cannot modify 'readonly' setting in readonly mode`). Выбран вариант 1: клиент не переопределяет
+явно заданный `readonly`; таким пользователям следует использовать `$c = $c->withReadOnly(1)`.
 
 Не ломают совместимость, поэтому их можно сделать в любой версии без этого ADR:
 - перевести комментарии на английский;

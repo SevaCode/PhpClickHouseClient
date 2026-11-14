@@ -27,7 +27,7 @@ class DriverFeaturesTest extends IntegrationTestCase
     {
         $client = $this->client();
         if ($symfony) {
-            $client->setHttpClient(HttpClient::create());
+            $client = $client->withHttpClient(HttpClient::create());
         }
 
         $client->fetchAll('SELECT number FROM numbers(10)', [], ['wait_end_of_query' => 1]);
@@ -37,18 +37,17 @@ class DriverFeaturesTest extends IntegrationTestCase
         $client->fetchAll('SELECT 1', [], ['query_id' => 'chc-it-' . ($id = bin2hex(random_bytes(4)))]);
         $this->assertSame("chc-it-$id", $client->getLastQueryId());
 
-        $client->setSessionId('chc-it-' . bin2hex(random_bytes(4)));
-        $client->readOnly(false);
+        $client = $client->withSession('chc-it-' . bin2hex(random_bytes(4)))->withReadOnly(0);
         $client->write('CREATE TEMPORARY TABLE tmp (x UInt8)');
         $client->write('INSERT INTO tmp VALUES (7)');
-        $client->readOnly(true);
+        $client = $client->withReadOnly(2);
         $this->assertSame(7, $client->fetchOne('SELECT x FROM tmp'));
         foreach ($client->iterate('SELECT x FROM tmp') as $row) {
             $this->assertSame(['x' => 7], $row);
         }
         $this->assertNotNull($client->getLastQueryId());
 
-        $client->setSessionId(null);
+        $client = $client->withSession(null);
         $e = $this->caughtException(fn() => $client->fetchOne('SELECT x FROM tmp'), ChcException::class);
         $this->assertSame(60, $e->getClickHouseErrorCode()); // UNKNOWN_TABLE
         $this->assertSame(404, $e->getHttpStatus());
@@ -58,12 +57,10 @@ class DriverFeaturesTest extends IntegrationTestCase
     {
         $this->assertTrue($this->client()->isAlive());
 
-        $client = new ChcClient();
-        $client->setUrl('http://127.0.0.1:1/');
-        $client->setRetries(2, 0.01);
+        $client = (new ChcClient('http://127.0.0.1:1/'))->withRetries(2, 0.01);
         $this->assertFalse(@$client->isAlive());
         $this->caughtException(fn() => @$client->fetchAll('SELECT 1'), ChcConnectionException::class);
-        $client->setHttpClient(HttpClient::create());
+        $client = $client->withHttpClient(HttpClient::create());
         $this->caughtException(fn() => $client->fetchAll('SELECT 1'), ChcConnectionException::class);
         $this->caughtException(fn() => iterator_to_array($client->iterate('SELECT 1')), ChcConnectionException::class);
     }

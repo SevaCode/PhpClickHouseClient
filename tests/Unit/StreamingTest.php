@@ -109,7 +109,7 @@ class StreamingTest extends TestCase
                 $inFlight--;
             })(), ['http_code' => 200]);
         });
-        $client->setPoolConcurrency(2);
+        $client = $client->withPoolConcurrency(2);
         $result = $client->getJsonPool(['a' => 'SELECT 1', 'b' => 'SELECT 2', 'c' => 'SELECT 3', 'd' => 'SELECT 4'], fn($data, $meta, $rows) => $rows);
         $this->assertSame(['a' => 0, 'b' => 0, 'c' => 0, 'd' => 0], $result);
         $this->assertLessThanOrEqual(2, $max);

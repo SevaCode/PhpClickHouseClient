@@ -77,15 +77,13 @@ class QueryParamsTest extends IntegrationTestCase
         $e = $this->caughtException(fn() => $client->write("CREATE TABLE $table (x UInt8) ENGINE = Memory"), ChcException::class);
         $this->assertSame(164, $e->getCode()); // READONLY
 
-        $client->readOnly(false);
+        $writeClient = $client->withReadOnly(0);
         try {
-            $client->write("CREATE TABLE $table (x UInt8, s String) ENGINE = Memory");
-            $client->write("INSERT INTO $table VALUES ({x:UInt8}, {s:String})", ['x' => 1, 's' => "it's"]);
-            $client->readOnly(true);
+            $writeClient->write("CREATE TABLE $table (x UInt8, s String) ENGINE = Memory");
+            $writeClient->write("INSERT INTO $table VALUES ({x:UInt8}, {s:String})", ['x' => 1, 's' => "it's"]);
             $this->assertSame([['x' => 1, 's' => "it's"]], $client->fetchAll("SELECT * FROM $table WHERE s = {s:String}", ['s' => "it's"]));
         } finally {
-            $client->readOnly(false);
-            $client->write("DROP TABLE IF EXISTS $table");
+            $writeClient->write("DROP TABLE IF EXISTS $table");
         }
     }
 
@@ -95,10 +93,9 @@ class QueryParamsTest extends IntegrationTestCase
         $this->assertSame(456, $e->getCode()); // UNKNOWN_QUERY_PARAMETER
     }
 
-    public function testReadOnlyOverPost(): void
+    public function testReadOnlyQueriesUsePost(): void
     {
         $client = $this->client();
-        $client->setReadOnlyOverPost(true);
         $long = str_repeat('x', 100000);
         $this->assertSame(100000, $client->fetchOne('SELECT toUInt32(length({s:String})) AS v', ['s' => $long]));
         $this->assertSame(100000, $client->fetchOne("SELECT toUInt32(length('$long')) AS v"));
@@ -110,11 +107,11 @@ class QueryParamsTest extends IntegrationTestCase
     public function testCredentialsAndTimeout(): void
     {
         $client = $this->client();
-        $client->setCredentials(getenv('CLICKHOUSE_USER') ?: 'default', getenv('CLICKHOUSE_PASSWORD') ?: '');
-        $client->setTimeout(5.0);
+        $client = $client->withCredentials(getenv('CLICKHOUSE_USER') ?: 'default', getenv('CLICKHOUSE_PASSWORD') ?: '')
+            ->withTimeout(5.0);
         $this->assertSame(1, $client->fetchOne('SELECT toUInt8(1) AS v'));
 
-        $client->setCredentials('chc_no_such_user', 'x');
+        $client = $client->withCredentials('chc_no_such_user', 'x');
         $e = $this->caughtException(fn() => $client->fetchOne('SELECT 1'), ChcException::class);
         $this->assertContains($e->getCode(), [192, 516]); // UNKNOWN_USER / AUTHENTICATION_FAILED
     }

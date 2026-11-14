@@ -96,8 +96,8 @@
 - [x] 2. Единственный транспорт на Symfony HttpClient, удалить `ChcHttpTransport` ([PR #8](https://github.com/sevacode/phpclickhouseclient/pull/8)).
 - [x] 3. `declare(strict_types=1)`, строгие типы в сигнатурах и свойствах ([PR #9](https://github.com/sevacode/phpclickhouseclient/pull/9)).
 - [x] 4. `ChcFormat` → `enum` ([PR #9](https://github.com/sevacode/phpclickhouseclient/pull/9)).
-- [ ] 5. Иммутабельный клиент (`with*()`).
-- [ ] 6. Чтение по умолчанию POST + `readonly=2`, `Content-Type: text/plain`.
+- [x] 5. Иммутабельный клиент (`with*()`) ([PR #10](https://github.com/sevacode/phpclickhouseclient/pull/10)).
+- [x] 6. Чтение по умолчанию POST + `readonly=2`, `Content-Type: text/plain` ([PR #10](https://github.com/sevacode/phpclickhouseclient/pull/10)).
 - [ ] 7. `ping(): bool` без исключений.
 - [ ] 8. Иерархия исключений, `getCode()` = код ошибки ClickHouse.
 - [ ] 9. `pool()` с объектами результата вместо callback `getJsonPool()`.

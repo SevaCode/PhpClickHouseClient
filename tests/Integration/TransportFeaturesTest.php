@@ -23,7 +23,7 @@ class TransportFeaturesTest extends IntegrationTestCase
     {
         $client = $this->client();
         if ($symfony) {
-            $client->setHttpClient(HttpClient::create());
+            $client = $client->withHttpClient(HttpClient::create());
         }
         return $client;
     }
@@ -37,7 +37,7 @@ class TransportFeaturesTest extends IntegrationTestCase
         $this->assertTrue($client->ping());
         $this->assertSame([['n' => 1]], $client->getJsonData('SELECT toUInt8(1) AS n'));
 
-        $client->setCompression(true);
+        $client = $client->withCompression(true);
         $sql = 'SELECT toUInt32(number) AS n, repeat(\'x\', 100) AS s FROM numbers(20000)';
         $this->assertCount(20000, $client->fetchAll($sql));
         $this->assertSame(19999, $client->fetchColumn($sql)[19999]);
@@ -78,44 +78,41 @@ class TransportFeaturesTest extends IntegrationTestCase
     public function testInsert(bool $compression): void
     {
         $client = $this->client();
-        $client->setCompression($compression);
+        $client = $client->withCompression($compression);
         $table = 'chc_it_' . bin2hex(random_bytes(4));
 
-        $client->readOnly(false);
-        $client->write("CREATE TABLE $table (id UInt32, s String, d DateTime, a Array(String)) ENGINE = Memory");
+        $writeClient = $client->withReadOnly(0);
+        $writeClient->write("CREATE TABLE $table (id UInt32, s String, d DateTime, a Array(String)) ENGINE = Memory");
         try {
-            $client->readOnly(true);
+            $client = $client->withReadOnly(2);
             $e = $this->caughtException(fn() => $client->insert($table, [['id' => 1, 's' => 'x', 'd' => '2024-01-01 00:00:00', 'a' => []]]), ChcException::class);
             $this->assertSame(164, $e->getCode()); // READONLY
 
-            $client->readOnly(false);
-            $client->insert($table, (static function () {
+            $writeClient->insert($table, (static function () {
                 for ($i = 0; $i < 100000; $i++) {
                     yield ['id' => $i, 's' => "it's \"$i\"", 'd' => new \DateTimeImmutable('2024-01-02 03:04:05'), 'a' => ['a', 'b']];
                 }
             })());
-            $client->insert($table, [[100000, 'list', '2024-01-01 00:00:00', []]], ['id', 's', 'd', 'a']);
+            $writeClient->insert($table, [[100000, 'list', '2024-01-01 00:00:00', []]], ['id', 's', 'd', 'a']);
 
-            $this->assertSame(100001, $client->fetchOne("SELECT toUInt32(count()) FROM $table"));
+            $this->assertSame(100001, $writeClient->fetchOne("SELECT toUInt32(count()) FROM $table"));
             $this->assertSame(
                 ['s' => "it's \"5\"", 'd' => '2024-01-02 03:04:05', 'a' => ['a', 'b']],
-                $client->fetchRow("SELECT s, d, a FROM $table WHERE id = 5"),
+                $writeClient->fetchRow("SELECT s, d, a FROM $table WHERE id = 5"),
             );
-            $this->assertSame('list', $client->fetchOne("SELECT s FROM $table WHERE id = 100000"));
+            $this->assertSame('list', $writeClient->fetchOne("SELECT s FROM $table WHERE id = 100000"));
 
-            $e = $this->caughtException(fn() => $client->insert($table, [['id' => 'not a number']]), ChcException::class);
+            $e = $this->caughtException(fn() => $writeClient->insert($table, [['id' => 'not a number']]), ChcException::class);
             $this->assertNotSame(0, $e->getCode());
         } finally {
-            $client->readOnly(false);
-            $client->write("DROP TABLE IF EXISTS $table");
+            $writeClient->write("DROP TABLE IF EXISTS $table");
         }
     }
 
     public function testPoolWithInjectedClientAndConcurrency(): void
     {
         $client = $this->client();
-        $client->setHttpClient(HttpClient::create());
-        $client->setPoolConcurrency(2);
+        $client = $client->withHttpClient(HttpClient::create())->withPoolConcurrency(2);
         $queries = [];
         for ($i = 0; $i < 5; $i++) {
             $queries["q$i"] = "SELECT toUInt8($i) AS n";
