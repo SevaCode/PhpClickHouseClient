@@ -156,6 +156,10 @@ final class ChcParam implements \Stringable
         ?string $name = null,
         bool $nullable = false,
     ): self {
+        if (null === $timezone && $value instanceof \DateTimeInterface) {
+            $timezone = self::inferDateTimeTimezone($value);
+        }
+
         return self::typed($value, ChcType::DateTime($timezone), $name, $nullable);
     }
 
@@ -306,9 +310,16 @@ final class ChcParam implements \Stringable
     }
 
     /** @param list<string|\DateTimeInterface> $value */
-    public static function ArrayDateTime(array $value, ?string $name = null): self
-    {
-        return self::Array($value, ChcType::DateTime(), $name);
+    public static function ArrayDateTime(
+        array $value,
+        ?string $name = null,
+        ?string $timezone = null,
+    ): self {
+        if (null === $timezone && array_is_list($value)) {
+            $timezone = self::inferArrayDateTimeTimezone($value);
+        }
+
+        return self::Array($value, ChcType::DateTime($timezone), $name);
     }
 
     /** @param list<string> $value */
@@ -375,5 +386,50 @@ final class ChcParam implements \Stringable
         }
 
         return new self($value, $nullable ? ChcType::Nullable($type) : $type, $name);
+    }
+
+    /** @param list<string|\DateTimeInterface> $value */
+    private static function inferArrayDateTimeTimezone(array $value): ?string
+    {
+        $timezone = null;
+        foreach ($value as $index => $item) {
+            $itemTimezone = $item instanceof \DateTimeInterface ? self::inferDateTimeTimezone($item) : null;
+            if (0 === $index) {
+                $timezone = $itemTimezone;
+            } elseif ($timezone !== $itemTimezone) {
+                throw new \InvalidArgumentException(
+                    'ArrayDateTime requires an explicit timezone when mixing timezones or date objects and strings',
+                );
+            }
+        }
+
+        return $timezone;
+    }
+
+    private static function inferDateTimeTimezone(\DateTimeInterface $value): string
+    {
+        $timezone = $value->getTimezone();
+        if (false === $timezone) {
+            throw new \InvalidArgumentException('Cannot infer the timezone of the DateTime value');
+        }
+
+        // PHP returns false for fixed offsets and abbreviations.
+        if (false !== $timezone->getTransitions(0, 0)) {
+            return $timezone->getName();
+        }
+
+        $offset = $value->getOffset();
+        if (0 === $offset) {
+            return 'UTC';
+        }
+        if (0 !== $offset % 3600 || $offset < -12 * 3600 || $offset > 14 * 3600) {
+            throw new \InvalidArgumentException(
+                'Cannot infer a ClickHouse timezone for fixed offset ' . $value->format('P')
+                . '. Pass timezone explicitly.',
+            );
+        }
+
+        // IANA Etc/GMT names use the opposite sign from ISO 8601 offsets.
+        return sprintf('Etc/GMT%+d', -intdiv($offset, 3600));
     }
 }

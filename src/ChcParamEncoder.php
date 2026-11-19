@@ -50,9 +50,13 @@ final class ChcParamEncoder
                 throw new \InvalidArgumentException('Duplicate query parameter: ' . $name);
             }
             $names[$name] = true;
-            $result['param_' . $name] = null !== $type && is_array($value)
-                ? self::literal($value, $type)
-                : self::encode($value);
+            $result['param_' . $name] = match (true) {
+                null !== $type && is_array($value) => self::literal($value, $type),
+                // ClickHouse's DateTime parameter parser needs padding for short Unix timestamps.
+                $value instanceof \DateTimeInterface && $type?->usesDateTimeParameterTimestamp() =>
+                    str_pad(self::dateTimeTimestamp($value), 10, '0', STR_PAD_LEFT),
+                default => self::encode($value),
+            };
         }
         return $result;
     }
@@ -107,7 +111,9 @@ final class ChcParamEncoder
             return self::quote($value);
         }
         if ($value instanceof \DateTimeInterface) {
-            return self::quote(self::dateTime($value));
+            return $type?->usesDateTimeParameterTimestamp()
+                ? self::dateTimeTimestamp($value)
+                : self::quote(self::dateTime($value));
         }
         if ($value instanceof \BackedEnum) {
             return self::literal($value->value);
@@ -158,6 +164,16 @@ final class ChcParamEncoder
         return '000000' === $value->format('u')
             ? $value->format('Y-m-d H:i:s')
             : $value->format('Y-m-d H:i:s.u');
+    }
+
+    private static function dateTimeTimestamp(\DateTimeInterface $value): string
+    {
+        $timestamp = $value->format('U');
+        if ($timestamp < 0 || $timestamp > 4294967295) {
+            throw new \InvalidArgumentException('DateTime query parameter is outside the ClickHouse DateTime range');
+        }
+
+        return $timestamp;
     }
 
     /**

@@ -109,6 +109,62 @@ class QueryParamsTest extends IntegrationTestCase
         ]], $this->client()->fetchAll($sql, [$id, $nullable, $types, $map, $at, $amount, 'kind' => 'click']));
     }
 
+    public function testDateTimeFactoriesPreserveBothInstantsInARepeatedLocalHour(): void
+    {
+        $berlin = new \DateTimeZone('Europe/Berlin');
+        $first = (new \DateTimeImmutable('2024-10-27T00:30:00Z'))->setTimezone($berlin);
+        $second = (new \DateTimeImmutable('2024-10-27T01:30:00Z'))->setTimezone($berlin);
+        $inferred = ChcParam::DateTime($second);
+        $override = ChcParam::DateTime($second, timezone: 'UTC');
+        $array = ChcParam::ArrayDateTime([$first, $second]);
+
+        $this->assertSame([
+            'inferred' => '2024-10-27 02:30:00',
+            'inferred_epoch' => $second->getTimestamp(),
+            'override' => '2024-10-27 01:30:00',
+            'override_epoch' => $second->getTimestamp(),
+            'timestamps' => [$first->getTimestamp(), $second->getTimestamp()],
+        ], $this->client()->fetchRow(
+            "SELECT toString($inferred) AS inferred, toUnixTimestamp($inferred) AS inferred_epoch, "
+            . "toString($override) AS override, toUnixTimestamp($override) AS override_epoch, "
+            . "arrayMap(x -> toUnixTimestamp(x), $array) AS timestamps",
+            [$inferred, $override, $array],
+        ));
+    }
+
+    public function testDateTimeFactoriesHandleFixedOffsetsAndMixedValuesWithAnExplicitTimezone(): void
+    {
+        $date = new \DateTimeImmutable('2024-01-02T01:00:00+03:00');
+        $epoch = new \DateTimeImmutable('1970-01-01T03:00:00+03:00');
+        $next = new \DateTimeImmutable('1970-01-01T03:00:42+03:00');
+        $inferred = ChcParam::DateTime($date);
+        $early = ChcParam::DateTime($epoch);
+        $array = ChcParam::ArrayDateTime([$epoch, $next, $date]);
+        $mixed = ChcParam::ArrayDateTime(
+            [$epoch, '2024-01-02 03:04:05', new \DateTimeImmutable('2024-01-02T05:34:05+05:30')],
+            timezone: 'Europe/Moscow',
+        );
+
+        $this->assertSame([
+            'inferred' => $date->getTimestamp(),
+            'inferred_zone' => 'Etc/GMT-3',
+            'local_time' => '2024-01-02 01:00:00',
+            'local_date' => '2024-01-02',
+            'local_day_start' => '2024-01-02 00:00:00',
+            'early' => 0,
+            'timestamps' => [0, 42, $date->getTimestamp()],
+            'array_dates' => ['1970-01-01', '1970-01-01', '2024-01-02'],
+            'mixed' => ['1970-01-01 03:00:00', '2024-01-02 03:04:05', '2024-01-02 03:04:05'],
+        ], $this->client()->fetchRow(
+            "SELECT toUnixTimestamp($inferred) AS inferred, timezoneOf($inferred) AS inferred_zone, "
+            . "toString($inferred) AS local_time, toDate($inferred) AS local_date, "
+            . "toString(toStartOfDay($inferred)) AS local_day_start, toUnixTimestamp($early) AS early, "
+            . "arrayMap(x -> toUnixTimestamp(x), $array) AS timestamps, arrayMap(x -> toDate(x), $array) AS array_dates, "
+            . "arrayMap(x -> toString(x), $mixed) AS mixed",
+            [$inferred, $early, $array, $mixed],
+        ));
+    }
+
     public function testPerQuerySettings(): void
     {
         $client = $this->client();

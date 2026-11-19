@@ -105,8 +105,17 @@ $rows = $client->fetchAll("SELECT number FROM numbers(5) WHERE number IN $ids", 
 ```
 
 `Array<Type>` factories such as `ArrayString()` and `ArrayDateTime()` preserve the type even for
-empty arrays. For timezone-specific `DateTime` values or composite types, use the generic factory,
-for example `ChcParam::Array($dates, ChcType::DateTime('UTC'))`.
+empty arrays. Use `ChcParam::Array($values, $itemType)` for other element types.
+
+`ChcParam::DateTime($value)` takes the timezone from a `DateTimeInterface` object.
+`ChcParam::ArrayDateTime($dates)` does the same when every object resolves to the same timezone.
+For fixed offsets and abbreviations, the type uses the equivalent `Etc/GMT` zone, such as
+`Etc/GMT-3` for `+03:00`, or `UTC` for zero offset. Offsets that lack an equivalent fixed
+zone, such as `+05:30`, require an explicit timezone.
+Pass `timezone: 'UTC'` (or another ClickHouse timezone) to override the inferred zone. An explicit
+timezone is required when an array mixes timezones or mixes objects and strings. Objects preserve
+their instant at second precision. ClickHouse interprets strings in the parameter's timezone.
+Without an explicit timezone, empty arrays, all-string arrays and scalar strings use the ClickHouse default.
 
 Use `nullable: true` for scalar factories, for example `ChcParam::String(null, nullable: true)`,
 or use `ChcParam::Nullable($value, $type)`. For other types, use `ChcParam::of($value, $type)`
