@@ -278,6 +278,41 @@ class ChcParamTest extends TestCase
         ], ChcParamEncoder::toHttpParams([$inferred, $strings, $empty]));
     }
 
+    /** @return iterable<string, array{string, string}> */
+    public static function fixedDateTimeZones(): iterable
+    {
+        yield 'positive offset' => ['+03:00', 'Etc/GMT-3'];
+        yield 'negative offset' => ['-05:00', 'Etc/GMT+5'];
+        yield 'maximum positive offset' => ['+14:00', 'Etc/GMT-14'];
+        yield 'maximum negative offset' => ['-12:00', 'Etc/GMT+12'];
+        yield 'zero offset' => ['+00:00', 'UTC'];
+        yield 'abbreviation' => ['MSK', 'Etc/GMT-3'];
+    }
+
+    /** @dataProvider fixedDateTimeZones */
+    public function testDateTimeFactoriesInferEquivalentFixedZones(string $source, string $expected): void
+    {
+        $date = new \DateTimeImmutable('2024-01-02 01:00:00', new \DateTimeZone($source));
+        $this->assertSame("{at:DateTime('$expected')}", (string)ChcParam::DateTime($date, name: 'at'));
+        $this->assertSame("{dates:Array(DateTime('$expected'))}", (string)ChcParam::ArrayDateTime([$date], 'dates'));
+    }
+
+    public function testDateTimeRequiresAnExplicitTimezoneForAnUnrepresentableOffset(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot infer a ClickHouse timezone for fixed offset +05:30. Pass timezone explicitly.');
+
+        ChcParam::DateTime(new \DateTimeImmutable('2024-01-02T01:00:00+05:30'));
+    }
+
+    public function testArrayDateTimeRequiresAnExplicitTimezoneForAnUnrepresentableOffset(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot infer a ClickHouse timezone for fixed offset -13:00. Pass timezone explicitly.');
+
+        ChcParam::ArrayDateTime([new \DateTimeImmutable('2024-01-02T01:00:00-13:00')]);
+    }
+
     /** @return iterable<string, array{list<string|\DateTimeInterface>}> */
     public static function datesWithoutACommonTimezone(): iterable
     {

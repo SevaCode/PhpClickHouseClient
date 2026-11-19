@@ -134,26 +134,34 @@ class QueryParamsTest extends IntegrationTestCase
 
     public function testDateTimeFactoriesHandleFixedOffsetsAndMixedValuesWithAnExplicitTimezone(): void
     {
+        $date = new \DateTimeImmutable('2024-01-02T01:00:00+03:00');
         $epoch = new \DateTimeImmutable('1970-01-01T03:00:00+03:00');
         $next = new \DateTimeImmutable('1970-01-01T03:00:42+03:00');
-        $inferred = ChcParam::DateTime($epoch);
-        $array = ChcParam::ArrayDateTime([$epoch, $next]);
+        $inferred = ChcParam::DateTime($date);
+        $early = ChcParam::DateTime($epoch);
+        $array = ChcParam::ArrayDateTime([$epoch, $next, $date]);
         $mixed = ChcParam::ArrayDateTime(
-            [$epoch, '2024-01-02 03:04:05', new \DateTimeImmutable('2024-01-02 00:04:05 UTC')],
+            [$epoch, '2024-01-02 03:04:05', new \DateTimeImmutable('2024-01-02T05:34:05+05:30')],
             timezone: 'Europe/Moscow',
         );
 
         $this->assertSame([
-            'inferred' => 0,
-            'inferred_zone' => 'UTC',
-            'timestamps' => [0, 42],
-            'array_zone' => 'UTC',
+            'inferred' => $date->getTimestamp(),
+            'inferred_zone' => 'Etc/GMT-3',
+            'local_time' => '2024-01-02 01:00:00',
+            'local_date' => '2024-01-02',
+            'local_day_start' => '2024-01-02 00:00:00',
+            'early' => 0,
+            'timestamps' => [0, 42, $date->getTimestamp()],
+            'array_dates' => ['1970-01-01', '1970-01-01', '2024-01-02'],
             'mixed' => ['1970-01-01 03:00:00', '2024-01-02 03:04:05', '2024-01-02 03:04:05'],
         ], $this->client()->fetchRow(
             "SELECT toUnixTimestamp($inferred) AS inferred, timezoneOf($inferred) AS inferred_zone, "
-            . "arrayMap(x -> toUnixTimestamp(x), $array) AS timestamps, timezoneOf({$array}[1]) AS array_zone, "
+            . "toString($inferred) AS local_time, toDate($inferred) AS local_date, "
+            . "toString(toStartOfDay($inferred)) AS local_day_start, toUnixTimestamp($early) AS early, "
+            . "arrayMap(x -> toUnixTimestamp(x), $array) AS timestamps, arrayMap(x -> toDate(x), $array) AS array_dates, "
             . "arrayMap(x -> toString(x), $mixed) AS mixed",
-            [$inferred, $array, $mixed],
+            [$inferred, $early, $array, $mixed],
         ));
     }
 
