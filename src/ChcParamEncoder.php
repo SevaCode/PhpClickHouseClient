@@ -28,6 +28,7 @@ final class ChcParamEncoder
         $result = [];
         $names = [];
         foreach ($params as $key => $value) {
+            $type = null;
             if ($value instanceof ChcParam) {
                 $name = $value->name;
                 if (is_string($key) && $key !== $name) {
@@ -36,6 +37,7 @@ final class ChcParamEncoder
                 if (null !== $sql && !str_contains($sql, (string)$value)) {
                     throw new \InvalidArgumentException('Query parameter ' . $value . ' is not used in the query');
                 }
+                $type = $value->type;
                 $value = $value->value;
             } else {
                 if (!is_string($key) || !self::isValidParameterName($key)) {
@@ -48,7 +50,9 @@ final class ChcParamEncoder
                 throw new \InvalidArgumentException('Duplicate query parameter: ' . $name);
             }
             $names[$name] = true;
-            $result['param_' . $name] = self::encode($value);
+            $result['param_' . $name] = null !== $type && is_array($value)
+                ? self::literal($value, $type)
+                : self::encode($value);
         }
         return $result;
     }
@@ -79,7 +83,7 @@ final class ChcParamEncoder
     /**
      * Value as a quoted SQL literal (used inside arrays, maps and tuples).
      */
-    private static function literal(mixed $value): string
+    private static function literal(mixed $value, ?ChcType $type = null): string
     {
         self::rejectTypedParameterValue($value);
 
@@ -96,6 +100,10 @@ final class ChcParamEncoder
             return self::float($value);
         }
         if (is_string($value)) {
+            if ($type?->usesNumericParameterLiteral()) {
+                $type->assertParameterValue($value);
+                return $value;
+            }
             return self::quote($value);
         }
         if ($value instanceof \DateTimeInterface) {
@@ -109,6 +117,12 @@ final class ChcParamEncoder
         }
         if (is_array($value)) {
             if (array_is_list($value)) {
+                if (null !== $itemType = $type?->arrayParameterItemType()) {
+                    return '[' . implode(',', array_map(
+                        static fn(mixed $item): string => self::literal($item, $itemType),
+                        $value,
+                    )) . ']';
+                }
                 return '[' . implode(',', array_map(self::literal(...), $value)) . ']';
             }
             $pairs = [];

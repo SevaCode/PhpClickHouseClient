@@ -116,6 +116,25 @@ class QueryParamsTest extends IntegrationTestCase
         $this->assertNotSame('7', $client->fetchOne("SELECT getSetting('max_threads') AS v") . '');
     }
 
+    public function testExactNumericRepresentationsAgainstClickHouse(): void
+    {
+        $max = '18446744073709551615';
+        $id = ChcParam::UInt64($max);
+        $ids = ChcParam::ArrayUInt64([$max]);
+        $amounts = ChcParam::Array(['12.3400', null], ChcType::Nullable(ChcType::Decimal(18, 4)));
+
+        $this->assertSame([
+            'id' => $max,
+            'first_id' => $max,
+            'amount_matches' => 1,
+            'is_null' => 1,
+        ], $this->client()->fetchRow(
+            "SELECT toString($id) AS id, toString({$ids}[1]) AS first_id, "
+            . "{$amounts}[1] = toDecimal64(12.34, 4) AS amount_matches, isNull({$amounts}[2]) AS is_null",
+            [$id, $ids, $amounts],
+        ));
+    }
+
     public function testWrite(): void
     {
         $client = $this->client();
