@@ -296,8 +296,9 @@ final class ChcParam implements \Stringable
 
     public function __construct(mixed $value, ChcType|string $type, ?string $name = null)
     {
-        $this->value = $value;
         $this->type = is_string($type) ? ChcType::of($type) : $type;
+        $this->type->assertParameterValue($value);
+        $this->value = $value;
         $this->name = $name ?? 'chc_' . ++self::$counter;
 
         if (!ChcParamEncoder::isValidParameterName($this->name)) {

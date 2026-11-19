@@ -116,6 +116,25 @@ name, throws before the request is sent. Use `nullable: true` for scalar factori
 and `ChcType::of()` support other types. `ChcType` is `Stringable`, so it can also be used in
 expressions such as `CAST(x AS $type)`.
 
+On 2.x, scalar factories and arrays built from `ChcType` factories check values at construction,
+without PHP scalar coercion. A mismatch throws `InvalidArgumentException`.
+
+| ClickHouse type | Accepted PHP value (apart from explicit nullable types) |
+|---|---|
+| `Bool` | `bool` |
+| `String`, `FixedString` | `string` or `Stringable` |
+| `Int*`, `UInt*` | `int` or an in-range base-10 integer string (no leading zeroes except zero itself) |
+| `Float32`, `Float64` | `int` or `float` |
+| `Decimal` | `int` or a decimal string such as `'12.3400'`; not `float` or scientific notation |
+| `Date`, `Date32`, `UUID`, `IPv4`, `IPv6` | `string` |
+| `DateTime`, `DateTime64` | `string` or `DateTimeInterface` |
+| `Array(T)` | A PHP list, checked element by element against `T` |
+
+For example, use `ChcParam::String('0')` instead of `ChcParam::String(false)`. ClickHouse still
+checks such things as date formats, decimal precision and scale, and map contents. Raw type strings
+(`ChcParam::of($value, 'SomeType')` or `ChcType::of('SomeType')`) and raw server-side parameters
+do not get the new value checks.
+
 ### Raw server-side parameters
 
 Values can also be supplied separately from SQL using ClickHouse
