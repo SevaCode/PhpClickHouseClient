@@ -12,6 +12,9 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 ### Changed
 - Typed scalar factories and typed array elements reject incompatible PHP values without coercion.
   Wide integers and decimals accept exact strings; raw type strings and raw parameters are unchanged.
+- `ChcParam::DateTime()` and `ChcParam::ArrayDateTime()` infer the timezone from date objects and
+  preserve their Unix timestamps. Both accept an explicit timezone, required for arrays that mix
+  timezones or date objects and strings.
 
 ## [2.0.0] — 2026-11-14
 

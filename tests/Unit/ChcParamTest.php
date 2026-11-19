@@ -238,15 +238,75 @@ class ChcParamTest extends TestCase
         );
     }
 
-    public function testArrayDateTimeFactoryUsesTheDefaultTimezoneAndSupportsExplicitTypes(): void
+    public function testDateTimeFactoryInfersTimezoneAndAcceptsAnOverride(): void
     {
-        $value = new \DateTimeImmutable('2024-01-02 03:04:05');
-        $dateTimes = ChcParam::ArrayDateTime([$value], 'times');
-        $dateTimesWithTimezone = ChcParam::Array([$value], ChcType::DateTime('UTC'), 'times_utc');
+        $value = new \DateTime('2024-01-02 03:04:05', new \DateTimeZone('Europe/Moscow'));
+        $inferred = ChcParam::DateTime($value, name: 'inferred', nullable: true);
+        $override = ChcParam::DateTime($value, timezone: 'UTC', name: 'override');
+        $string = ChcParam::DateTime('2024-01-02 03:04:05', name: 'local');
+        $null = ChcParam::DateTime(null, name: 'missing', nullable: true);
 
-        $this->assertSame('{times:Array(DateTime)}', (string)$dateTimes);
-        $this->assertSame("['2024-01-02 03:04:05']", ChcParamEncoder::toHttpParams([$dateTimes])['param_times']);
-        $this->assertSame("{times_utc:Array(DateTime('UTC'))}", (string)$dateTimesWithTimezone);
+        $this->assertSame("{inferred:Nullable(DateTime('Europe/Moscow'))}", (string)$inferred);
+        $this->assertSame("{override:DateTime('UTC')}", (string)$override);
+        $this->assertSame('{local:DateTime}', (string)$string);
+        $this->assertSame('{missing:Nullable(DateTime)}', (string)$null);
+        $this->assertSame([
+            'param_inferred' => '1704153845',
+            'param_override' => '1704153845',
+            'param_local' => '2024-01-02 03:04:05',
+            'param_missing' => '\N',
+        ], ChcParamEncoder::toHttpParams([$inferred, $override, $string, $null]));
+        $this->assertSame('Europe/Moscow', $value->getTimezone()->getName());
+    }
+
+    public function testArrayDateTimeFactoryInfersACommonTimezone(): void
+    {
+        $zone = new \DateTimeZone('Europe/Moscow');
+        $first = new \DateTimeImmutable('2024-01-02 03:04:05', $zone);
+        $second = new \DateTime('2024-01-02 03:04:06', $zone);
+        $inferred = ChcParam::ArrayDateTime([$first, $second], 'inferred');
+        $strings = ChcParam::ArrayDateTime(['2024-01-02 03:04:05'], 'local');
+        $empty = ChcParam::ArrayDateTime([], 'empty', timezone: 'Europe/Moscow');
+
+        $this->assertSame("{inferred:Array(DateTime('Europe/Moscow'))}", (string)$inferred);
+        $this->assertSame('{local:Array(DateTime)}', (string)$strings);
+        $this->assertSame("{empty:Array(DateTime('Europe/Moscow'))}", (string)$empty);
+        $this->assertSame([
+            'param_inferred' => '[1704153845,1704153846]',
+            'param_local' => "['2024-01-02 03:04:05']",
+            'param_empty' => '[]',
+        ], ChcParamEncoder::toHttpParams([$inferred, $strings, $empty]));
+    }
+
+    /** @return iterable<string, array{list<string|\DateTimeInterface>}> */
+    public static function datesWithoutACommonTimezone(): iterable
+    {
+        $value = new \DateTimeImmutable('2024-01-02T03:04:05+03:00');
+        yield 'different zones' => [[$value, new \DateTimeImmutable('2024-01-02T03:04:05+04:00')]];
+        yield 'object followed by string' => [[$value, '2024-01-02 03:04:05']];
+        yield 'string followed by object' => [['2024-01-02 03:04:05', $value]];
+    }
+
+    /**
+     * @dataProvider datesWithoutACommonTimezone
+     * @param list<string|\DateTimeInterface> $dates
+     */
+    public function testArrayDateTimeRequiresAnExplicitTimezoneForMixedElements(array $dates): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('ArrayDateTime requires an explicit timezone');
+
+        ChcParam::ArrayDateTime($dates);
+    }
+
+    public function testZonedDateTimeRejectsTimestampsOutsideClickHouseRange(): void
+    {
+        $value = ChcParam::DateTime(new \DateTimeImmutable('2106-02-07 06:28:16 UTC'));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('outside the ClickHouse DateTime range');
+
+        ChcParamEncoder::toHttpParams([$value]);
     }
 
     public function testArrayFactoriesRejectInvalidNames(): void

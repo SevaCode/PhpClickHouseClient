@@ -274,6 +274,13 @@ final class ChcType implements \Stringable
     }
 
     /** @internal */
+    public function usesDateTimeParameterTimestamp(): bool
+    {
+        return 'Array' !== $this->kind && ($this->innerType?->usesDateTimeParameterTimestamp()
+            ?? ('DateTime' === $this->kind && 'DateTime' !== $this->type));
+    }
+
+    /** @internal */
     public function usesNumericParameterLiteral(): bool
     {
         if (null === $this->kind || 'Array' === $this->kind) {

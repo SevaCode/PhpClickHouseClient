@@ -156,6 +156,10 @@ final class ChcParam implements \Stringable
         ?string $name = null,
         bool $nullable = false,
     ): self {
+        if (null === $timezone && $value instanceof \DateTimeInterface) {
+            $timezone = self::clickHouseTimezone(self::dateTimeTimezone($value));
+        }
+
         return self::typed($value, ChcType::DateTime($timezone), $name, $nullable);
     }
 
@@ -306,9 +310,16 @@ final class ChcParam implements \Stringable
     }
 
     /** @param list<string|\DateTimeInterface> $value */
-    public static function ArrayDateTime(array $value, ?string $name = null): self
-    {
-        return self::Array($value, ChcType::DateTime(), $name);
+    public static function ArrayDateTime(
+        array $value,
+        ?string $name = null,
+        ?string $timezone = null,
+    ): self {
+        if (null === $timezone && array_is_list($value)) {
+            $timezone = self::inferArrayDateTimeTimezone($value);
+        }
+
+        return self::Array($value, ChcType::DateTime($timezone), $name);
     }
 
     /** @param list<string> $value */
@@ -375,5 +386,39 @@ final class ChcParam implements \Stringable
         }
 
         return new self($value, $nullable ? ChcType::Nullable($type) : $type, $name);
+    }
+
+    /** @param list<string|\DateTimeInterface> $value */
+    private static function inferArrayDateTimeTimezone(array $value): ?string
+    {
+        $first = $value[0] ?? null;
+        $timezone = $first instanceof \DateTimeInterface ? self::dateTimeTimezone($first) : null;
+        $name = $timezone?->getName();
+        foreach ($value as $item) {
+            $itemName = $item instanceof \DateTimeInterface ? self::dateTimeTimezone($item)->getName() : null;
+            if ($name !== $itemName) {
+                throw new \InvalidArgumentException(
+                    'ArrayDateTime requires an explicit timezone when mixing timezones or date objects and strings',
+                );
+            }
+        }
+
+        return null === $timezone ? null : self::clickHouseTimezone($timezone);
+    }
+
+    private static function dateTimeTimezone(\DateTimeInterface $value): \DateTimeZone
+    {
+        $timezone = $value->getTimezone();
+        if (false === $timezone) {
+            throw new \InvalidArgumentException('Cannot infer the timezone of the DateTime value');
+        }
+
+        return $timezone;
+    }
+
+    private static function clickHouseTimezone(\DateTimeZone $timezone): string
+    {
+        // PHP returns false for fixed offsets and abbreviations.
+        return false === $timezone->getTransitions(0, 0) ? 'UTC' : $timezone->getName();
     }
 }
