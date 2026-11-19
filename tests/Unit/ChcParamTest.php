@@ -29,6 +29,21 @@ class ChcParamTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function arrayFactories(): iterable
+    {
+        foreach ([
+            'Int8', 'Int16', 'Int32', 'Int64', 'Int128', 'Int256',
+            'UInt8', 'UInt16', 'UInt32', 'UInt64', 'UInt128', 'UInt256',
+            'Float32', 'Float64', 'Bool', 'String', 'UUID', 'Date', 'Date32', 'IPv4', 'IPv6',
+        ] as $itemType) {
+            $factory = 'Array' . $itemType;
+            yield $factory => [$factory, $itemType];
+        }
+    }
+
+    /**
      * @dataProvider scalarFactories
      */
     public function testScalarFactories(string $factory, string $type): void
@@ -87,6 +102,43 @@ class ChcParamTest extends TestCase
 
         $auto = ChcParam::UInt64(42);
         $this->assertMatchesRegularExpression('/^\{chc_[1-9][0-9]*:UInt64}$/', (string)$auto);
+    }
+
+    /**
+     * @dataProvider arrayFactories
+     */
+    public function testSimpleArrayFactoriesAcceptEmptyArraysAndGenerateNames(string $factory, string $itemType): void
+    {
+        $named = call_user_func([ChcParam::class, $factory], [], 'items');
+        $this->assertInstanceOf(ChcParam::class, $named);
+        $this->assertSame('{items:Array(' . $itemType . ')}', (string)$named);
+        $this->assertSame(['param_items' => '[]'], ChcParamEncoder::toHttpParams([$named]));
+
+        $auto = call_user_func([ChcParam::class, $factory], []);
+        $this->assertInstanceOf(ChcParam::class, $auto);
+        $this->assertSame('Array(' . $itemType . ')', (string)$auto->type);
+        $this->assertMatchesRegularExpression('/^chc_[1-9][0-9]*$/', $auto->name);
+        $this->assertSame(['param_' . $auto->name => '[]'], ChcParamEncoder::toHttpParams([$auto]));
+    }
+
+    public function testArrayStringAndUInt64FactoriesEncodeValues(): void
+    {
+        $strings = ChcParam::ArrayString(['click', 'view'], 'types');
+        $ids = ChcParam::ArrayUInt64([1, 2], 'ids');
+
+        $this->assertSame('{types:Array(String)}', (string)$strings);
+        $this->assertSame('{ids:Array(UInt64)}', (string)$ids);
+        $this->assertSame(
+            ['param_types' => "['click','view']", 'param_ids' => '[1,2]'],
+            ChcParamEncoder::toHttpParams([$strings, $ids]),
+        );
+    }
+
+    public function testArrayFactoriesRejectInvalidNames(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        ChcParam::ArrayString([], 'invalid-name');
     }
 
     public function testNamedAndAutoNamedPlaceholders(): void

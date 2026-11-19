@@ -94,14 +94,17 @@ Named `ChcParam` factories render their own `{name:Type}` placeholder; the value
 as `param_<name>`:
 
 ```php
-$id = ChcParam::UInt64(42);
-$types = ChcParam::Array(['click', 'view'], ChcType::String(), 'types');
+$ids = ChcParam::ArrayUInt64([42, 43], 'ids');
+$types = ChcParam::ArrayString(['click', 'view'], 'types');
 $name = ChcParam::String(null, nullable: true);
 $rows = $client->fetchAll(
-    "SELECT * FROM events WHERE user_id = $id AND type IN $types AND isNull($name)",
-    [$id, $types, $name],
+    "SELECT * FROM events WHERE user_id IN $ids AND type IN $types AND isNull($name)",
+    [$ids, $types, $name],
 );
 ```
+
+`Array<Type>` factories are available for the simple scalar types. The type remains explicit even for
+an empty array; use `ChcParam::Array($value, $itemType, $name)` for parameterized or composite types.
 
 The name can be omitted; auto-generated names have the form `chc_N`. Pass a `ChcParam` in a list
 or under a matching string key. An unused typed parameter, or a string key that does not match its

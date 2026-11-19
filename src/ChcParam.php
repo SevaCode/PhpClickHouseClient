@@ -169,6 +169,111 @@ final class ChcParam implements \Stringable
         return new self($value, ChcType::Array($item), $name);
     }
 
+    public static function ArrayInt8(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Int8(), $name);
+    }
+
+    public static function ArrayInt16(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Int16(), $name);
+    }
+
+    public static function ArrayInt32(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Int32(), $name);
+    }
+
+    public static function ArrayInt64(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Int64(), $name);
+    }
+
+    public static function ArrayInt128(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Int128(), $name);
+    }
+
+    public static function ArrayInt256(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Int256(), $name);
+    }
+
+    public static function ArrayUInt8(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::UInt8(), $name);
+    }
+
+    public static function ArrayUInt16(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::UInt16(), $name);
+    }
+
+    public static function ArrayUInt32(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::UInt32(), $name);
+    }
+
+    public static function ArrayUInt64(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::UInt64(), $name);
+    }
+
+    public static function ArrayUInt128(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::UInt128(), $name);
+    }
+
+    public static function ArrayUInt256(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::UInt256(), $name);
+    }
+
+    public static function ArrayFloat32(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Float32(), $name);
+    }
+
+    public static function ArrayFloat64(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Float64(), $name);
+    }
+
+    public static function ArrayBool(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Bool(), $name);
+    }
+
+    public static function ArrayString(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::String(), $name);
+    }
+
+    public static function ArrayUUID(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::UUID(), $name);
+    }
+
+    public static function ArrayDate(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Date(), $name);
+    }
+
+    public static function ArrayDate32(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::Date32(), $name);
+    }
+
+    public static function ArrayIPv4(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::IPv4(), $name);
+    }
+
+    public static function ArrayIPv6(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::IPv6(), $name);
+    }
+
     public static function Nullable(mixed $value, ChcType $type, ?string $name = null): self
     {
         return new self($value, ChcType::Nullable($type), $name);
