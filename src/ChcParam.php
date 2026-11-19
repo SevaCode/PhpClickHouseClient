@@ -259,6 +259,11 @@ final class ChcParam implements \Stringable
         return self::Array($value, ChcType::Date(), $name);
     }
 
+    public static function ArrayDateTime(array $value, ?string $name = null): self
+    {
+        return self::Array($value, ChcType::DateTime(), $name);
+    }
+
     public static function ArrayDate32(array $value, ?string $name = null): self
     {
         return self::Array($value, ChcType::Date32(), $name);

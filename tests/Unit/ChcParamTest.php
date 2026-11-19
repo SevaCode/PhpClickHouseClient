@@ -36,7 +36,7 @@ class ChcParamTest extends TestCase
         foreach ([
             'Int8', 'Int16', 'Int32', 'Int64', 'Int128', 'Int256',
             'UInt8', 'UInt16', 'UInt32', 'UInt64', 'UInt128', 'UInt256',
-            'Float32', 'Float64', 'Bool', 'String', 'UUID', 'Date', 'Date32', 'IPv4', 'IPv6',
+            'Float32', 'Float64', 'Bool', 'String', 'UUID', 'Date', 'Date32', 'DateTime', 'IPv4', 'IPv6',
         ] as $itemType) {
             $factory = 'Array' . $itemType;
             yield $factory => [$factory, $itemType];
@@ -132,6 +132,17 @@ class ChcParamTest extends TestCase
             ['param_types' => "['click','view']", 'param_ids' => '[1,2]'],
             ChcParamEncoder::toHttpParams([$strings, $ids]),
         );
+    }
+
+    public function testArrayDateTimeFactoryUsesTheDefaultTimezoneAndSupportsExplicitTypes(): void
+    {
+        $value = new \DateTimeImmutable('2024-01-02 03:04:05');
+        $dateTimes = ChcParam::ArrayDateTime([$value], 'times');
+        $dateTimesWithTimezone = ChcParam::Array([$value], ChcType::DateTime('UTC'), 'times_utc');
+
+        $this->assertSame('{times:Array(DateTime)}', (string)$dateTimes);
+        $this->assertSame("['2024-01-02 03:04:05']", ChcParamEncoder::toHttpParams([$dateTimes])['param_times']);
+        $this->assertSame("{times_utc:Array(DateTime('UTC'))}", (string)$dateTimesWithTimezone);
     }
 
     public function testArrayFactoriesRejectInvalidNames(): void

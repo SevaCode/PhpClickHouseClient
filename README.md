@@ -96,15 +96,18 @@ as `param_<name>`:
 ```php
 $ids = ChcParam::ArrayUInt64([42, 43], 'ids');
 $types = ChcParam::ArrayString(['click', 'view'], 'types');
+$times = ChcParam::ArrayDateTime([new DateTimeImmutable('2024-01-02 03:04:05')], 'times');
 $name = ChcParam::String(null, nullable: true);
 $rows = $client->fetchAll(
-    "SELECT * FROM events WHERE user_id IN $ids AND type IN $types AND isNull($name)",
-    [$ids, $types, $name],
+    "SELECT * FROM events WHERE user_id IN $ids AND type IN $types AND ts IN $times AND isNull($name)",
+    [$ids, $types, $times, $name],
 );
 ```
 
 `Array<Type>` factories are available for the simple scalar types. The type remains explicit even for
-an empty array; use `ChcParam::Array($value, $itemType, $name)` for parameterized or composite types.
+an empty array. `ArrayDateTime()` uses `DateTime` without an explicit timezone; use
+`ChcParam::Array($value, ChcType::DateTime('UTC'), $name)` for a timezone-specific array or the generic
+factory for other parameterized or composite types.
 
 The name can be omitted; auto-generated names have the form `chc_N`. Pass a `ChcParam` in a list
 or under a matching string key. An unused typed parameter, or a string key that does not match its

@@ -64,10 +64,12 @@ ClickHouse 24.1 и latest показала:
 
 - Для массивов добавлены краткие фабрики `ChcParam::Array<Type>(array $value, ?string $name = null)`
   для простых скалярных типов без параметров: `Int8`–`Int256`, `UInt8`–`UInt256`, `Float32`,
-  `Float64`, `Bool`, `String`, `UUID`, `Date`, `Date32`, `IPv4` и `IPv6`. Каждая эквивалентна
+  `Float64`, `Bool`, `String`, `UUID`, `Date`, `Date32`, `DateTime` без явно заданного часового пояса,
+  `IPv4` и `IPv6`. Каждая эквивалентна
   `ChcParam::Array($value, ChcType::<Type>(), $name)`. Параметр типа остаётся явным, в том числе для
-  пустого массива. Параметризованные (`DateTime`, `DateTime64`, `Decimal`, `FixedString`), составные
-  и nullable-комбинации не размножаются отдельными фабриками: для них остаётся общая `Array`.
+  пустого массива. Вариант `DateTime` с явно заданным часовым поясом, `DateTime64`, `Decimal`,
+  `FixedString`, составные и nullable-комбинации не размножаются отдельными фабриками: для них остаётся
+  общая `Array`.
 
   Общая форма — `ChcParam::of($value, ChcType|string $type, ?string $name)`.
 - `ChcParam` передаётся в массиве параметров списком или под ключом, совпадающим с его именем.
