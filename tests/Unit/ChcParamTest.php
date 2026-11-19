@@ -15,7 +15,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 class ChcParamTest extends TestCase
 {
     /**
-     * @return iterable<string, array{string, string}>
+     * @return iterable<string, array{string, mixed}>
      */
     public static function scalarFactories(): iterable
     {
@@ -24,7 +24,15 @@ class ChcParamTest extends TestCase
             'UInt8', 'UInt16', 'UInt32', 'UInt64', 'UInt128', 'UInt256',
             'Float32', 'Float64', 'Bool', 'String', 'UUID', 'Date', 'Date32', 'IPv4', 'IPv6',
         ] as $factory) {
-            yield $factory => [$factory, $factory];
+            yield $factory => [$factory, match ($factory) {
+                'Bool' => false,
+                'String' => 'hello',
+                'UUID' => '00000000-0000-0000-0000-000000000001',
+                'Date', 'Date32' => '2024-01-02',
+                'IPv4' => '127.0.0.1',
+                'IPv6' => '::1',
+                default => 1,
+            }];
         }
     }
 
@@ -46,15 +54,111 @@ class ChcParamTest extends TestCase
     /**
      * @dataProvider scalarFactories
      */
-    public function testScalarFactories(string $factory, string $type): void
+    public function testScalarFactories(string $factory, mixed $value): void
     {
-        $param = call_user_func([ChcParam::class, $factory], 1, 'n');
+        $param = call_user_func([ChcParam::class, $factory], $value, 'n');
         $this->assertInstanceOf(ChcParam::class, $param);
-        $this->assertSame('{n:' . $type . '}', (string)$param);
+        $this->assertSame('{n:' . $factory . '}', (string)$param);
+        $this->assertSame($value, $param->value);
 
-        $nullable = call_user_func([ChcParam::class, $factory], 1, 'n', true);
+        $nullable = call_user_func([ChcParam::class, $factory], $value, 'n', true);
         $this->assertInstanceOf(ChcParam::class, $nullable);
-        $this->assertSame('{n:Nullable(' . $type . ')}', (string)$nullable);
+        $this->assertSame('{n:Nullable(' . $factory . ')}', (string)$nullable);
+    }
+
+    /** @return iterable<string, array{ChcType, mixed, string}> */
+    public static function invalidValues(): iterable
+    {
+        yield 'bool as string' => [ChcType::String(), false, 'for String: bool'];
+        yield 'int as string' => [ChcType::String(), 42, 'for String: int'];
+        yield 'nullable invalid non-null' => [ChcType::Nullable(ChcType::String()), 42, 'for String: int'];
+        yield 'int as bool' => [ChcType::Bool(), 1, 'for Bool: int'];
+        yield 'string as float' => [ChcType::Float64(), '1.25', 'for Float64: string'];
+        yield 'float as decimal' => [ChcType::Decimal(18, 4), 12.34, 'for Decimal(18, 4): float'];
+        yield 'exponent as decimal' => [ChcType::Decimal(18, 4), '1.2e1', 'for Decimal(18, 4): string'];
+        yield 'date object' => [ChcType::Date(), new \DateTimeImmutable(), 'for Date: DateTimeImmutable'];
+        yield 'timestamp as datetime' => [ChcType::DateTime(), 1, 'for DateTime: int'];
+        yield 'fraction as integer' => [ChcType::Int64(), '1.0', 'for Int64: string'];
+        yield 'padded integer' => [ChcType::Int64(), '001', 'for Int64: string'];
+        yield 'int8 underflow' => [ChcType::Int8(), -129, 'for Int8: int'];
+        yield 'int8 overflow' => [ChcType::Int8(), 128, 'for Int8: int'];
+        yield 'uint64 negative' => [ChcType::UInt64(), -1, 'for UInt64: int'];
+        yield 'uint64 overflow' => [ChcType::UInt64(), '18446744073709551616', 'for UInt64: string'];
+        yield 'int128 underflow' => [ChcType::Int128(), '-170141183460469231731687303715884105729', 'for Int128: string'];
+        yield 'int256 overflow' => [
+            ChcType::Int256(), '57896044618658097711785492504343953926634992332820282019728792003956564819968',
+            'for Int256: string',
+        ];
+        yield 'array must be a list' => [ChcType::Array(ChcType::String()), ['k' => 'v'], 'for Array(String): array'];
+        yield 'nested invalid element' => [
+            ChcType::Array(ChcType::Array(ChcType::Nullable(ChcType::String()))),
+            [[null, 1]],
+            'value[0][1] for String: int',
+        ];
+    }
+
+    /** @dataProvider invalidValues */
+    public function testRejectsIncompatibleValuesAtConstruction(ChcType $type, mixed $value, string $reason): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($reason);
+
+        ChcParam::of($value, $type);
+    }
+
+    public function testFactoryRejectsIncompatibleStringValueWithoutPhpCoercion(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('for String: bool');
+
+        // Reflection invokes methods without PHP scalar strictness.
+        (new \ReflectionMethod(ChcParam::class, 'String'))->invoke(null, false);
+    }
+
+    public function testExactRepresentationsArePreserved(): void
+    {
+        $max = '18446744073709551615';
+        $min = '-170141183460469231731687303715884105728';
+        $decimal = '12.3400';
+        $stringable = new class implements \Stringable {
+            public function __toString(): string
+            {
+                return 'text';
+            }
+        };
+        $params = [
+            ChcParam::UInt64($max, 'uint'),
+            ChcParam::Int128($min, 'int'),
+            ChcParam::Decimal($decimal, 18, 4, 'amount'),
+            ChcParam::ArrayUInt64([$max, 1], 'uints'),
+            ChcParam::Array([$decimal, null], ChcType::Nullable(ChcType::Decimal(18, 4)), 'amounts'),
+            ChcParam::String($stringable, 'text'),
+        ];
+
+        $this->assertSame($max, $params[0]->value);
+        $this->assertSame($decimal, $params[2]->value);
+        $this->assertSame($stringable, $params[5]->value);
+        $this->assertSame([
+            'param_uint' => $max,
+            'param_int' => $min,
+            'param_amount' => $decimal,
+            'param_uints' => '[' . $max . ',1]',
+            'param_amounts' => '[' . $decimal . ',NULL]',
+            'param_text' => 'text',
+        ], ChcParamEncoder::toHttpParams($params));
+    }
+
+    public function testRawTypeStringsKeepCallerControlledEncoding(): void
+    {
+        $this->assertSame([
+            'param_raw' => '0',
+            'param_custom' => '0',
+            'param_plain' => '0',
+        ], ChcParamEncoder::toHttpParams([
+            ChcParam::of(false, 'String', 'raw'),
+            ChcParam::of(false, ChcType::of('String'), 'custom'),
+            'plain' => false,
+        ]));
     }
 
     public function testNullableAndParameterizedFactories(): void
@@ -222,12 +326,13 @@ class ChcParamTest extends TestCase
     {
         $nested = ChcParam::of(1, ChcType::UInt64(), 'inner');
         foreach ([
-            ['outer' => [$nested]],
-            ['outer' => ChcParam::of($nested, ChcType::String(), 'outer')],
-            ['outer' => ChcType::String()],
+            static fn(): array => ['outer' => [$nested]],
+            static fn(): array => ['outer' => ChcParam::of($nested, ChcType::String(), 'outer')],
+            static fn(): array => ['outer' => ChcParam::of($nested, 'String', 'outer')],
+            static fn(): array => ['outer' => ChcType::String()],
         ] as $params) {
             try {
-                ChcParamEncoder::toHttpParams($params);
+                ChcParamEncoder::toHttpParams($params());
                 $this->fail('Expected nested typed parameter to be rejected');
             } catch (\InvalidArgumentException $e) {
                 $this->assertStringStartsWith('ChcParam cannot be nested', $e->getMessage());

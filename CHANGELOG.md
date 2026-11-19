@@ -9,6 +9,10 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 - Typed query parameters with `ChcType`, `ChcParam::of()`, named `ChcParam` factories, list parameters,
   and validation for unused typed parameters.
 
+### Changed
+- Typed scalar factories and typed array elements reject incompatible PHP values without coercion.
+  Wide integers and decimals accept exact strings; raw type strings and raw parameters are unchanged.
+
 ## [2.0.0] — 2026-11-14
 
 ### Removed
