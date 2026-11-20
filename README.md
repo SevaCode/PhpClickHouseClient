@@ -134,6 +134,9 @@ checks such things as date formats, decimal precision and scale, and map content
 (`ChcParam::of($value, 'SomeType')` or `ChcType::of('SomeType')`) and [named parameters](#named-parameters)
 bypass these client-side value checks.
 
+Integer bounds are checked at construction only. When writing unquoted numeric strings inside
+typed array literals, the encoder checks their syntax, not their range.
+
 ## Connection and configuration
 
 `ChcClient` defaults to `http://localhost:8123/`. Its constructor accepts an optional URL and a

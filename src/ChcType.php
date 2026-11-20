@@ -13,6 +13,9 @@ namespace SevaCode\ClickHouseClient;
  */
 final class ChcType implements \Stringable
 {
+    private const INTEGER_LITERAL_PATTERN = '/\A-?(?:0|[1-9][0-9]*)\z/';
+    private const DECIMAL_LITERAL_PATTERN = '/\A-?[0-9]+(?:\.[0-9]+)?\z/';
+
     /**
      * Value bounds per integer kind as decimal strings: [max, abs(min)],
      * with null for the lower bound of unsigned kinds.
@@ -270,7 +273,7 @@ final class ChcType implements \Stringable
             'String', 'FixedString' => is_string($value) || $value instanceof \Stringable,
             'UUID', 'Date', 'Date32', 'IPv4', 'IPv6' => is_string($value),
             'DateTime', 'DateTime64' => is_string($value) || $value instanceof \DateTimeInterface,
-            'Decimal' => is_int($value) || (is_string($value) && 1 === preg_match('/\A-?[0-9]+(?:\.[0-9]+)?\z/', $value)),
+            'Decimal' => is_int($value) || (is_string($value) && 1 === preg_match(self::DECIMAL_LITERAL_PATTERN, $value)),
             'Map' => is_array($value),
             'Array' => false,
             default => self::isValidInteger($value, self::INTEGER_LIMITS[$this->kind]),
@@ -289,20 +292,24 @@ final class ChcType implements \Stringable
     }
 
     /** @internal */
-    public function usesNumericParameterLiteral(): bool
+    public function numericParameterLiteralPattern(): ?string
     {
         if (null === $this->kind || 'Array' === $this->kind) {
-            return false;
+            return null;
         }
 
-        return $this->innerType?->usesNumericParameterLiteral()
-            ?? ('Decimal' === $this->kind || isset(self::INTEGER_LIMITS[$this->kind]));
+        return $this->innerType?->numericParameterLiteralPattern()
+            ?? match (true) {
+                'Decimal' === $this->kind => self::DECIMAL_LITERAL_PATTERN,
+                isset(self::INTEGER_LIMITS[$this->kind]) => self::INTEGER_LITERAL_PATTERN,
+                default => null,
+            };
     }
 
     /** @param array{string, ?string} $limits */
     private static function isValidInteger(mixed $value, array $limits): bool
     {
-        if (!is_int($value) && (!is_string($value) || 1 !== preg_match('/\A-?(?:0|[1-9][0-9]*)\z/', $value))) {
+        if (!is_int($value) && (!is_string($value) || 1 !== preg_match(self::INTEGER_LITERAL_PATTERN, $value))) {
             return false;
         }
 

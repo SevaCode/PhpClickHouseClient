@@ -100,11 +100,13 @@ final class ChcParamEncoder
             return self::float($value);
         }
         if (is_string($value)) {
-            if ($type?->usesNumericParameterLiteral()) {
-                $type->assertParameterValue($value);
-                return $value;
+            if (null === $pattern = $type?->numericParameterLiteralPattern()) {
+                return self::quote($value);
             }
-            return self::quote($value);
+            if (1 !== preg_match($pattern, $value)) {
+                throw new \InvalidArgumentException('Invalid numeric parameter literal for ' . $type);
+            }
+            return $value;
         }
         if ($value instanceof \DateTimeInterface) {
             return self::quote(self::dateTime($value));
