@@ -13,6 +13,10 @@ namespace SevaCode\ClickHouseClient;
  */
 final class ChcType implements \Stringable
 {
+    /**
+     * Value bounds per integer kind as decimal strings: [max, abs(min)],
+     * with null for the lower bound of unsigned kinds.
+     */
     private const INTEGER_LIMITS = [
         'Int8' => ['127', '128'],
         'Int16' => ['32767', '32768'],
@@ -31,8 +35,19 @@ final class ChcType implements \Stringable
         'UInt256' => ['115792089237316195423570985008687907853269984665640564039457584007913129639935', null],
     ];
 
+    /**
+     * Rendered ClickHouse type expression, e.g. "Array(Nullable(String))".
+     */
     private string $type;
 
+    /**
+     * @param ?string $kind Type family name without arguments ("Int64", "Nullable", "Array");
+     *                      null for free-form types built via of() or Tuple()
+     * @param ?string $type Rendered type expression when it differs from $kind
+     *                      (e.g. "Decimal(10, 2)" or a free-form expression); null to reuse $kind
+     * @param ?self $innerType Wrapped item type for single-argument wrappers
+     *                         (Array, Nullable, LowCardinality); null otherwise
+     */
     private function __construct(
         private ?string $kind,
         ?string $type = null,
