@@ -124,6 +124,31 @@ class QueryParamsTest extends IntegrationTestCase
         $this->client()->fetchOne("SELECT $ids", [$ids]);
     }
 
+    public function testNestedNullableDecimalAndWideIntegerArraysPreservePrecision(): void
+    {
+        $amount = '123456789012345678.1234';
+        $min = '-170141183460469231731687303715884105728';
+        $amounts = ChcParam::of([[$amount, null], []], 'Array(Array(Nullable(Decimal(24, 4))))');
+        $integers = ChcParam::ArrayInt128([$min]);
+
+        $this->assertSame([
+            'amounts' => [[$amount, null], []],
+            'integers' => [$min],
+        ], $this->client()->fetchRow(
+            "SELECT arrayMap(a -> arrayMap(x -> toString(x), a), $amounts) AS amounts, "
+            . "arrayMap(x -> toString(x), $integers) AS integers",
+            [$amounts, $integers],
+        ));
+    }
+
+    public function testDecimalArrayDoesNotTruncateAnOverScaleString(): void
+    {
+        $amounts = ChcParam::Array(['0.001'], ChcType::Decimal(4, 2));
+
+        $this->expectException(ChcException::class);
+        $this->client()->fetchOne("SELECT $amounts", [$amounts]);
+    }
+
     public function testPerQuerySettings(): void
     {
         $client = $this->client();

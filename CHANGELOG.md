@@ -10,7 +10,8 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
   and validation for unused typed parameters.
 
 ### Fixed
-- Typed `Array(UInt64)` parameters send in-range decimal string IDs without quotes or loss of precision.
+- Typed integer and decimal arrays send exact numeric strings without quotes or loss of precision,
+  including in nested arrays and nullable elements. Untyped parameters are unchanged.
 
 ## [1.4.0] — 2026-11-14
 

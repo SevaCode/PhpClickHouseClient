@@ -44,7 +44,7 @@ class ChcParamEncoderTest extends TestCase
         );
     }
 
-    public function testEncodesStringIdsOnlyForTypedUInt64Arrays(): void
+    public function testEncodesStringIdsWithoutChangingStringOrRawArrays(): void
     {
         $ids = [42, '0', '9223372036854775808', '18446744073709551615'];
         $literal = '[42,0,9223372036854775808,18446744073709551615]';
@@ -72,6 +72,36 @@ class ChcParamEncoderTest extends TestCase
         $this->assertSame(
             ['param_ids' => "['18446744073709551616','-1','1,2','1\\n']"],
             ChcParamEncoder::toHttpParams([$ids]),
+        );
+    }
+
+    public function testKeepsOutOfRangeIntegersQuoted(): void
+    {
+        $signed = ChcParam::ArrayInt8(['-129', '-128', '127', '128'], 'signed');
+        $unsigned = ChcParam::ArrayUInt8(['-1', '255', '256'], 'unsigned');
+
+        $this->assertSame([
+            'param_signed' => "['-129',-128,127,'128']",
+            'param_unsigned' => "['-1',255,'256']",
+        ], ChcParamEncoder::toHttpParams([$signed, $unsigned]));
+    }
+
+    public function testEncodesNestedNullableIntegerArrays(): void
+    {
+        $min = '-170141183460469231731687303715884105728';
+        $type = ChcType::Array(ChcType::Nullable(ChcType::Int128()));
+        $param = ChcParam::Array([[$min, null], [], ['0']], $type, 'values');
+
+        $this->assertSame(['param_values' => "[[$min,NULL],[],[0]]"], ChcParamEncoder::toHttpParams([$param]));
+    }
+
+    public function testKeepsInexactOrMalformedDecimalStringsQuoted(): void
+    {
+        $amounts = ChcParam::of(['12.34', '-0.01', '123.45', '0.001', '1e-2'], 'Array(Decimal(4, 2))', 'amounts');
+
+        $this->assertSame(
+            ['param_amounts' => "[12.34,-0.01,'123.45','0.001','1e-2']"],
+            ChcParamEncoder::toHttpParams([$amounts]),
         );
     }
 
