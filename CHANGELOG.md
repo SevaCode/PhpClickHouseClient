@@ -11,7 +11,10 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 
 ### Changed
 - Typed scalar factories and typed array elements reject incompatible PHP values without coercion.
-  Wide integers and decimals accept exact strings; raw type strings and raw parameters are unchanged.
+  Wide integers and decimals accept exact strings.
+
+### Fixed
+- An explicit `Array(UInt64)` type string now validates and encodes decimal string IDs like `ChcParam::ArrayUInt64()`.
 
 ## [2.0.0] — 2026-11-14
 
