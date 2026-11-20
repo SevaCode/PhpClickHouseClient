@@ -9,6 +9,9 @@ All notable changes. The project follows [Semantic Versioning](https://semver.or
 - Typed query parameters with `ChcType`, `ChcParam::of()`, named `ChcParam` factories, list parameters,
   and validation for unused typed parameters.
 
+### Fixed
+- Typed `Array(UInt64)` parameters send in-range decimal string IDs without quotes or loss of precision.
+
 ## [1.4.0] — 2026-11-14
 
 ### Deprecated

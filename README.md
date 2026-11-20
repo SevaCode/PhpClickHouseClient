@@ -120,6 +120,10 @@ an empty array. `ArrayDateTime()` uses `DateTime` without an explicit timezone; 
 `ChcParam::Array($value, ChcType::DateTime('UTC'), $name)` for a timezone-specific array or the generic
 factory for other parameterized or composite types.
 
+For `Array(UInt64)`, pass IDs larger than PHP's integer range as decimal strings:
+`ChcParam::ArrayUInt64([42, '18446744073709551615'], 'ids')`. In-range strings without
+signs or leading zeroes are sent as unquoted numbers, without conversion to PHP integers or floats.
+
 The name can be omitted; auto-generated names have the form `chc_N`. Pass a `ChcParam` in a list
 or under a matching string key. An unused typed parameter, or a string key that does not match its
 name, throws before the request is sent. Use `nullable: true` for scalar factories or
@@ -149,6 +153,10 @@ or `null`; `fetchColumn()` returns the first column of every row.
 PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside arrays),
 `DateTimeInterface` → `Y-m-d H:i:s[.u]` (pass a `'Y-m-d'` string for `Date`), lists → `Array(...)`,
 and string-keyed arrays → `Map(...)`.
+
+Raw arrays still quote string elements. When using a handwritten placeholder with string IDs,
+use `ChcParam::ArrayUInt64()` instead, or keep `{ids:Array(String)}` and convert on the server
+with `arrayMap(id -> accurateCast(id, 'UInt64'), {ids:Array(String)})`.
 
 ## Read-only mode
 

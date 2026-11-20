@@ -106,6 +106,24 @@ class QueryParamsTest extends IntegrationTestCase
         ]], $this->client()->fetchAll($sql, [$id, $nullable, $types, $map, $at, $amount, 'kind' => 'click']));
     }
 
+    public function testUInt64ArrayPreservesStringIds(): void
+    {
+        $ids = ChcParam::ArrayUInt64([42, '9223372036854775808', '18446744073709551615'], 'ids');
+
+        $this->assertSame(
+            ['42', '9223372036854775808', '18446744073709551615'],
+            $this->client()->fetchOne("SELECT arrayMap(id -> toString(id), $ids)", [$ids]),
+        );
+    }
+
+    public function testUInt64ArrayDoesNotWrapOverflowingString(): void
+    {
+        $ids = ChcParam::ArrayUInt64(['18446744073709551616'], 'ids');
+
+        $this->expectException(ChcException::class);
+        $this->client()->fetchOne("SELECT $ids", [$ids]);
+    }
+
     public function testPerQuerySettings(): void
     {
         $client = $this->client();

@@ -2,7 +2,9 @@
 
 namespace SevaCode\ClickHouseClient\Tests\Unit;
 
+use SevaCode\ClickHouseClient\ChcParam;
 use SevaCode\ClickHouseClient\ChcParamEncoder;
+use SevaCode\ClickHouseClient\ChcType;
 use SevaCode\ClickHouseClient\Tests\TestCase;
 
 class ChcParamEncoderTest extends TestCase
@@ -39,6 +41,37 @@ class ChcParamEncoderTest extends TestCase
         $this->assertSame(
             ['param_id' => '5', 'param_tags' => "['a','b']"],
             ChcParamEncoder::toHttpParams(['id' => 5, 'tags' => ['a', 'b']]),
+        );
+    }
+
+    public function testEncodesStringIdsOnlyForTypedUInt64Arrays(): void
+    {
+        $ids = [42, '0', '9223372036854775808', '18446744073709551615'];
+        $literal = '[42,0,9223372036854775808,18446744073709551615]';
+        $strings = ['00042', '18446744073709551615'];
+
+        $this->assertSame([
+            'param_factory' => $literal,
+            'param_generic' => $literal,
+            'param_explicit' => $literal,
+            'param_strings' => "['00042','18446744073709551615']",
+            'param_raw' => "['00042','18446744073709551615']",
+        ], ChcParamEncoder::toHttpParams([
+            ChcParam::ArrayUInt64($ids, 'factory'),
+            ChcParam::Array($ids, ChcType::UInt64(), 'generic'),
+            ChcParam::of($ids, 'Array( UInt64 )', 'explicit'),
+            ChcParam::ArrayString($strings, 'strings'),
+            'raw' => $strings,
+        ]));
+    }
+
+    public function testKeepsInvalidUInt64StringsQuoted(): void
+    {
+        $ids = ChcParam::ArrayUInt64(['18446744073709551616', '-1', '1,2', "1\n"], 'ids');
+
+        $this->assertSame(
+            ['param_ids' => "['18446744073709551616','-1','1,2','1\\n']"],
+            ChcParamEncoder::toHttpParams([$ids]),
         );
     }
 
