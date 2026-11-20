@@ -244,6 +244,10 @@ final class ChcType implements \Stringable
             throw new \InvalidArgumentException('Unbalanced parentheses in ClickHouse type: ' . $type);
         }
 
+        if (1 === preg_match('/\A\s*Array\s*\(\s*UInt64\s*\)\s*\z/', $type)) {
+            return new self('Array', $type, self::UInt64());
+        }
+
         return new self(null, $type);
     }
 

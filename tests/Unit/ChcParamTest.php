@@ -151,6 +151,14 @@ class ChcParamTest extends TestCase
         ], ChcParamEncoder::toHttpParams($params));
     }
 
+    public function testExplicitUInt64ArrayRejectsOverflowAtConstruction(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('value[0] for UInt64: string');
+
+        ChcParam::of(['18446744073709551616'], 'Array(UInt64)', 'ids');
+    }
+
     public function testEncodingDoesNotRecheckIntegerRange(): void
     {
         $value = '18446744073709551615';

@@ -76,6 +76,9 @@ PHP values map to: `null` → `NULL`, `bool` → `1`/`0` (`true`/`false` inside 
 `DateTimeInterface` → `Y-m-d H:i:s[.u]` (pass a `'Y-m-d'` string for `Date`), lists → `Array(...)`,
 and string-keyed arrays → `Map(...)`.
 
+Untyped parameters still quote string elements in arrays. For a handwritten placeholder with string UInt64 IDs,
+use `arrayMap(id -> accurateCast(id, 'UInt64'), {ids:Array(String)})`, or use a typed parameter below.
+
 ### Typed parameters
 
 The `ChcParam` examples use APIs added after 2.0.0. To try them from the development branch,
@@ -104,6 +107,10 @@ $ids = ChcParam::ArrayUInt64([1, 3]);
 $rows = $client->fetchAll("SELECT number FROM numbers(5) WHERE number IN $ids", [$ids]);
 ```
 
+IDs above PHP's integer range can be passed as decimal strings, for example
+`ChcParam::ArrayUInt64(['18446744073709551615'])`. The equivalent explicit type
+`ChcParam::of(['18446744073709551615'], 'Array(UInt64)')` also sends the exact number without quotes.
+
 `Array<Type>` factories such as `ArrayString()` and `ArrayDateTime()` preserve the type even for
 empty arrays. For timezone-specific `DateTime` values or composite types, use the generic factory,
 for example `ChcParam::Array($dates, ChcType::DateTime('UTC'))`.
@@ -130,9 +137,9 @@ without PHP scalar coercion. A mismatch throws `InvalidArgumentException`.
 | `Array(T)` | A PHP list, checked element by element against `T` |
 
 For example, use `ChcParam::String('0')` instead of `ChcParam::String(false)`. ClickHouse still
-checks such things as date formats, decimal precision and scale, and map contents. Raw type strings
-(`ChcParam::of($value, 'SomeType')` or `ChcType::of('SomeType')`) and [named parameters](#named-parameters)
-bypass these client-side value checks.
+checks such things as date formats, decimal precision and scale, and map contents.
+[Named parameters](#named-parameters) and raw type strings bypass these client-side value checks,
+except that the explicit type string `Array(UInt64)` is checked like `ChcParam::ArrayUInt64()`.
 
 Integer bounds are checked at construction only. When writing unquoted numeric strings inside
 typed array literals, the encoder checks their syntax, not their range.

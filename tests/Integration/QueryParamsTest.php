@@ -135,6 +135,16 @@ class QueryParamsTest extends IntegrationTestCase
         ));
     }
 
+    public function testExplicitUInt64ArrayPreservesStringIds(): void
+    {
+        $ids = ChcParam::of([42, '9223372036854775808', '18446744073709551615'], 'Array( UInt64 )', 'ids');
+
+        $this->assertSame(
+            ['42', '9223372036854775808', '18446744073709551615'],
+            $this->client()->fetchOne("SELECT arrayMap(id -> toString(id), $ids)", [$ids]),
+        );
+    }
+
     public function testWrite(): void
     {
         $client = $this->client();
