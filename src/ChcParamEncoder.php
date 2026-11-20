@@ -17,6 +17,7 @@ namespace SevaCode\ClickHouseClient;
 final class ChcParamEncoder
 {
     private const NAME_PATTERN = '/^[a-zA-Z_][a-zA-Z0-9_]*$/';
+    private const UINT64_MAX = '18446744073709551615';
 
     /**
      * @param array<array-key, mixed> $params ['id' => 5, 'names' => ['a', 'b']]
@@ -36,7 +37,6 @@ final class ChcParamEncoder
                 if (null !== $sql && !str_contains($sql, (string)$value)) {
                     throw new \InvalidArgumentException('Query parameter ' . $value . ' is not used in the query');
                 }
-                $value = $value->value;
             } else {
                 if (!is_string($key) || !self::isValidParameterName($key)) {
                     throw new \InvalidArgumentException('Invalid query parameter name: ' . var_export($key, true));
@@ -48,7 +48,9 @@ final class ChcParamEncoder
                 throw new \InvalidArgumentException('Duplicate query parameter: ' . $name);
             }
             $names[$name] = true;
-            $result['param_' . $name] = self::encode($value);
+            $result['param_' . $name] = $value instanceof ChcParam
+                ? self::encodeTyped($value)
+                : self::encode($value);
         }
         return $result;
     }
@@ -74,6 +76,30 @@ final class ChcParamEncoder
             $value instanceof \BackedEnum => self::encode($value->value),
             default => self::literal($value),
         };
+    }
+
+    private static function encodeTyped(ChcParam $param): string
+    {
+        $value = $param->value;
+        if (is_array($value) && array_is_list($value)
+            && 1 === preg_match('/\A\s*Array\s*\(\s*UInt64\s*\)\s*\z/', (string)$param->type)
+        ) {
+            return '[' . implode(',', array_map(self::uint64Literal(...), $value)) . ']';
+        }
+
+        return self::encode($value);
+    }
+
+    private static function uint64Literal(mixed $value): string
+    {
+        // ClickHouse can wrap out-of-range unquoted integers, so leave those strings quoted.
+        if (is_string($value) && 1 === preg_match('/\A(?:0|[1-9][0-9]{0,19})\z/', $value)
+            && (strlen($value) < 20 || strcmp($value, self::UINT64_MAX) <= 0)
+        ) {
+            return $value;
+        }
+
+        return self::literal($value);
     }
 
     /**
