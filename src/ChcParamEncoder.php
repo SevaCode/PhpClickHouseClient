@@ -10,14 +10,34 @@ namespace SevaCode\ClickHouseClient;
  *
  * The value is parsed by the server as text of the declared type, so it is never
  * interpreted as SQL. Top-level strings use the escaped (TSV) text format; array,
- * map and nested values use quoted SQL literals.
+ * map and nested values use literal syntax.
  *
  * @link https://clickhouse.com/docs/en/interfaces/cli#cli-queries-with-parameters
  */
 final class ChcParamEncoder
 {
     private const NAME_PATTERN = '/^[a-zA-Z_][a-zA-Z0-9_]*$/';
-    private const UINT64_MAX = '18446744073709551615';
+    private const INTEGER_LITERAL_PATTERN = '/\A-?(?:0|[1-9][0-9]*)\z/';
+    private const DECIMAL_LITERAL_PATTERN = '/\A-?([0-9]+)(?:\.([0-9]+))?\z/';
+
+    /** Bounds as decimal strings: [max, abs(min)], with null for unsigned types. */
+    private const INTEGER_LIMITS = [
+        'Int8' => ['127', '128'],
+        'Int16' => ['32767', '32768'],
+        'Int32' => ['2147483647', '2147483648'],
+        'Int64' => ['9223372036854775807', '9223372036854775808'],
+        'Int128' => ['170141183460469231731687303715884105727', '170141183460469231731687303715884105728'],
+        'Int256' => [
+            '57896044618658097711785492504343953926634992332820282019728792003956564819967',
+            '57896044618658097711785492504343953926634992332820282019728792003956564819968',
+        ],
+        'UInt8' => ['255', null],
+        'UInt16' => ['65535', null],
+        'UInt32' => ['4294967295', null],
+        'UInt64' => ['18446744073709551615', null],
+        'UInt128' => ['340282366920938463463374607431768211455', null],
+        'UInt256' => ['115792089237316195423570985008687907853269984665640564039457584007913129639935', null],
+    ];
 
     /**
      * @param array<array-key, mixed> $params ['id' => 5, 'names' => ['a', 'b']]
@@ -81,31 +101,50 @@ final class ChcParamEncoder
     private static function encodeTyped(ChcParam $param): string
     {
         $value = $param->value;
-        if (is_array($value) && array_is_list($value)
-            && 1 === preg_match('/\A\s*Array\s*\(\s*UInt64\s*\)\s*\z/', (string)$param->type)
-        ) {
-            return '[' . implode(',', array_map(self::uint64Literal(...), $value)) . ']';
-        }
-
-        return self::encode($value);
+        return is_array($value) ? self::literal($value, trim((string)$param->type)) : self::encode($value);
     }
 
-    private static function uint64Literal(mixed $value): string
+    private static function innerType(?string $type, string $wrapper): ?string
     {
-        // ClickHouse can wrap out-of-range unquoted integers, so leave those strings quoted.
-        if (is_string($value) && 1 === preg_match('/\A(?:0|[1-9][0-9]{0,19})\z/', $value)
-            && (strlen($value) < 20 || strcmp($value, self::UINT64_MAX) <= 0)
-        ) {
-            return $value;
+        return null !== $type && 1 === preg_match('/\A' . $wrapper . '\s*\((.*)\)\z/s', $type, $matches)
+            ? trim($matches[1])
+            : null;
+    }
+
+    private static function fitsNumericType(string $value, string $type): bool
+    {
+        $type = self::innerType($type, 'Nullable') ?? $type;
+
+        // Unquoting must not let ClickHouse wrap integers or truncate decimals.
+        if (isset(self::INTEGER_LIMITS[$type])) {
+            if (1 !== preg_match(self::INTEGER_LITERAL_PATTERN, $value)) {
+                return false;
+            }
+            $negative = str_starts_with($value, '-');
+            $limit = self::INTEGER_LIMITS[$type][$negative ? 1 : 0];
+            $digits = $negative ? substr($value, 1) : $value;
+
+            return null !== $limit && (strlen($digits) < strlen($limit)
+                || (strlen($digits) === strlen($limit) && strcmp($digits, $limit) <= 0));
         }
 
-        return self::literal($value);
+        if (1 !== preg_match('/\ADecimal\s*\(\s*([0-9]{1,2})\s*,\s*([0-9]{1,2})\s*\)\z/', $type, $parts)
+            || 1 !== preg_match(self::DECIMAL_LITERAL_PATTERN, $value, $digits)
+        ) {
+            return false;
+        }
+
+        $precision = (int)$parts[1];
+        $scale = (int)$parts[2];
+        return $precision >= 1 && $precision <= 76 && $scale <= $precision
+            && strlen(ltrim($digits[1], '0')) <= $precision - $scale
+            && strlen($digits[2] ?? '') <= $scale;
     }
 
     /**
-     * Value as a quoted SQL literal (used inside arrays, maps and tuples).
+     * Value as a literal inside an array, map or tuple.
      */
-    private static function literal(mixed $value): string
+    private static function literal(mixed $value, ?string $type = null): string
     {
         self::rejectTypedParameterValue($value);
 
@@ -122,7 +161,7 @@ final class ChcParamEncoder
             return self::float($value);
         }
         if (is_string($value)) {
-            return self::quote($value);
+            return null !== $type && self::fitsNumericType($value, $type) ? $value : self::quote($value);
         }
         if ($value instanceof \DateTimeInterface) {
             return self::quote(self::dateTime($value));
@@ -135,7 +174,11 @@ final class ChcParamEncoder
         }
         if (is_array($value)) {
             if (array_is_list($value)) {
-                return '[' . implode(',', array_map(self::literal(...), $value)) . ']';
+                $itemType = self::innerType($type, 'Array');
+                $items = null === $itemType
+                    ? array_map(self::literal(...), $value)
+                    : array_map(static fn(mixed $item): string => self::literal($item, $itemType), $value);
+                return '[' . implode(',', $items) . ']';
             }
             $pairs = [];
             foreach ($value as $key => $item) {

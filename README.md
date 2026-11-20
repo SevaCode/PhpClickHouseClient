@@ -120,9 +120,12 @@ an empty array. `ArrayDateTime()` uses `DateTime` without an explicit timezone; 
 `ChcParam::Array($value, ChcType::DateTime('UTC'), $name)` for a timezone-specific array or the generic
 factory for other parameterized or composite types.
 
-For `Array(UInt64)`, pass IDs larger than PHP's integer range as decimal strings:
-`ChcParam::ArrayUInt64([42, '18446744073709551615'], 'ids')`. In-range strings without
-signs or leading zeroes are sent as unquoted numbers, without conversion to PHP integers or floats.
+Typed arrays of `Int*`, `UInt*` and `Decimal(precision, scale)` accept exact numeric strings,
+including in nested arrays and `Nullable` elements. For example, use
+`ChcParam::ArrayUInt64([42, '18446744073709551615'], 'ids')` for IDs outside PHP's integer range.
+The encoder sends in-range base-10 integer strings without leading zeroes, and decimal strings
+that fit the declared precision and scale, as unquoted numbers without converting them to PHP
+integers or floats. Other strings remain quoted and are handled by ClickHouse.
 
 The name can be omitted; auto-generated names have the form `chc_N`. Pass a `ChcParam` in a list
 or under a matching string key. An unused typed parameter, or a string key that does not match its
