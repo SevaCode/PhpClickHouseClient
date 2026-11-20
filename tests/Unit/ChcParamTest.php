@@ -84,6 +84,9 @@ class ChcParamTest extends TestCase
         yield 'int8 overflow' => [ChcType::Int8(), 128, 'for Int8: int'];
         yield 'uint64 negative' => [ChcType::UInt64(), -1, 'for UInt64: int'];
         yield 'uint64 overflow' => [ChcType::UInt64(), '18446744073709551616', 'for UInt64: string'];
+        yield 'array uint64 overflow' => [
+            ChcType::Array(ChcType::UInt64()), ['18446744073709551616'], 'value[0] for UInt64: string',
+        ];
         yield 'int128 underflow' => [ChcType::Int128(), '-170141183460469231731687303715884105729', 'for Int128: string'];
         yield 'int256 overflow' => [
             ChcType::Int256(), '57896044618658097711785492504343953926634992332820282019728792003956564819968',
@@ -146,6 +149,36 @@ class ChcParamTest extends TestCase
             'param_amounts' => '[' . $decimal . ',NULL]',
             'param_text' => 'text',
         ], ChcParamEncoder::toHttpParams($params));
+    }
+
+    public function testEncodingDoesNotRecheckIntegerRange(): void
+    {
+        $value = '18446744073709551615';
+        $param = ChcParam::ArrayUInt64([&$value], 'ids');
+
+        $value = '18446744073709551616';
+
+        $this->assertSame(['param_ids' => '[' . $value . ']'], ChcParamEncoder::toHttpParams([$param]));
+    }
+
+    /** @return iterable<string, array{ChcType, string, string}> */
+    public static function malformedNumericLiterals(): iterable
+    {
+        yield 'integer with fractional part' => [ChcType::UInt64(), '1', '1.0'];
+        yield 'integer with trailing newline' => [ChcType::UInt64(), '1', "1\n"];
+        yield 'nullable decimal with exponent' => [ChcType::Nullable(ChcType::Decimal(18, 4)), '1.0000', '1e0'];
+    }
+
+    /** @dataProvider malformedNumericLiterals */
+    public function testEncodingRejectsMalformedNumericStrings(ChcType $type, string $value, string $malformed): void
+    {
+        $param = ChcParam::Array([&$value], $type);
+        $value = $malformed;
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid numeric parameter literal');
+
+        ChcParamEncoder::toHttpParams([$param]);
     }
 
     public function testRawTypeStringsKeepCallerControlledEncoding(): void
